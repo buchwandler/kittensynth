@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-
 from kitteng2p.types import PhonemizeResult
+
 from kittensynth import KittenVoice
 
 

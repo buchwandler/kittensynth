@@ -56,4 +56,7 @@ jobs:
         with:
           name: release-dists-${{ github.event.release.tag_name }}
           path: dist
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@v1.14.1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          attestations: false
