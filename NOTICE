@@ -1,0 +1,4 @@
+kittensynth
+
+This repository contains independently authored integration/frontend code. It does not include or
+relicense KittenTTS model weights or voice-style assets. Runtime assets retain upstream licensing.

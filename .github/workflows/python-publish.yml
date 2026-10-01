@@ -1,0 +1,59 @@
+name: Upload Python Package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Resolve release version
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([a-zA-Z0-9.-]+)?$ ]]; then
+            echo "::error::Expected release tag v<version>, got '$RELEASE_TAG'"
+            exit 1
+          fi
+          echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+      - run: python -m pip install --upgrade pip build twine packaging
+      - run: rm -rf dist && python -m build --sdist --wheel
+      - run: |
+          python tools/check_release_artifacts.py dist --expected-version "${{ steps.release.outputs.version }}"
+          python -m twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-dists-${{ github.event.release.tag_name }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dists-${{ github.event.release.tag_name }}
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
