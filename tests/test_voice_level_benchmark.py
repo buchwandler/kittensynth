@@ -7,7 +7,12 @@ from typing import Any
 import numpy as np
 import pytest
 
-from benchmarks.promote_voice_calibration import PRODUCTION_CATALOG, build_candidate, main
+from benchmarks.promote_voice_calibration import (
+    PRODUCTION_CATALOG,
+    build_candidate,
+    build_candidate_from_reports,
+    main,
+)
 from benchmarks.voice_level_benchmark import (
     aggregate_measurements,
     build_report,
@@ -404,3 +409,73 @@ def test_candidate_rejects_non_finite_measurement_report():
 def test_promoter_refuses_production_catalog_path(tmp_path):
     with pytest.raises(SystemExit, match="never writes directly"):
         main([str(tmp_path / "does-not-exist.json"), "--output", str(PRODUCTION_CATALOG)])
+
+
+def test_multi_report_promotion_rejects_metadata_mismatch():
+    first = identity("Bella", "expr-voice-2-f")
+    second = identity("Jasper", "expr-voice-2-m")
+    first_report = report_for([first], synthetic_measurements(first, values_around(-22.0)))
+    second_report = report_for([second], synthetic_measurements(second, values_around(-22.0)))
+    second_report["generated_with"]["kittensynth"] = "0.2.0"
+
+    with pytest.raises(ValueError, match="mismatched generated_with"):
+        build_candidate_from_reports([first_report, second_report])
+
+
+def test_multi_report_promotion_rejects_duplicate_keys():
+    entry = identity("Jasper", "expr-voice-2-m")
+    report = report_for([entry], synthetic_measurements(entry, values_around(-22.0)))
+
+    with pytest.raises(ValueError, match="duplicate calibration key across reports"):
+        build_candidate_from_reports([report, report])
+
+
+def test_multi_report_promotion_merges_disjoint_reports_and_sums_counts():
+    bella = identity("Bella", "expr-voice-2-f")
+    jasper = identity("Jasper", "expr-voice-2-m")
+    reports = [
+        report_for([entry], synthetic_measurements(entry, values_around(-22.0)))
+        for entry in (bella, jasper)
+    ]
+
+    candidate, counts = build_candidate_from_reports(reports)
+
+    assert set(candidate["voices"]) == {bella["calibration_key"], jasper["calibration_key"]}
+    assert counts == {"eligible": 2, "high_variability": 0, "incomplete": 0}
+
+
+def test_multi_report_promotion_preserves_single_report_result():
+    entry = identity("Jasper", "expr-voice-2-m")
+    report = report_for([entry], synthetic_measurements(entry, values_around(-22.0)))
+
+    assert build_candidate_from_reports([report]) == build_candidate(report)
+
+
+def test_promoter_cli_merges_reports_without_overwriting_inputs(tmp_path):
+    entries = [
+        identity("Bella", "expr-voice-2-f"),
+        identity("Jasper", "expr-voice-2-m"),
+    ]
+    report_paths = []
+    for index, entry in enumerate(entries):
+        report = report_for([entry], synthetic_measurements(entry, values_around(-22.0)))
+        report_path = tmp_path / f"report-{index}.json"
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        report_paths.append(report_path)
+    output = tmp_path / "candidate.json"
+
+    assert main([*(str(path) for path in report_paths), "--output", str(output)]) == 0
+
+    candidate = json.loads(output.read_text(encoding="utf-8"))
+    assert set(candidate["voices"]) == {entry["calibration_key"] for entry in entries}
+    assert all(path.exists() for path in report_paths)
+
+
+def test_promoter_refuses_to_overwrite_any_input_report(tmp_path):
+    entry = identity("Jasper", "expr-voice-2-m")
+    report = report_for([entry], synthetic_measurements(entry, values_around(-22.0)))
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="must not overwrite a measurement report"):
+        main([str(report_path), "--output", str(report_path), "--force"])

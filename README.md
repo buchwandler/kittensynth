@@ -107,7 +107,7 @@ with KittenVoice.from_pretrained("nano-0.8-int8") as model:
     result = model.synthesize_prepared("Prepared speech.", voice="Jasper", config=config)
 ```
 
-Catalog lookup uses the exact managed model ID and internal voice/style ID, not the friendly alias. The packaged measured catalog covers all eight internal voices for `nano-0.8-int8`; local models do not inherit managed gains. A reviewed explicit `gain_db` override is available for a local model. Calibration is neither request-time loudness measurement nor dynamic normalization/limiting. See [benchmark documentation](benchmarks/README.md) for the reproducible measurement and promotion workflow and catalog provenance.
+Catalog lookup uses the exact managed model ID and internal voice/style ID, not the friendly alias. The packaged measured catalog covers all eight internal voices for `micro-0.8`, `mini-0.8`, `nano-0.8-int8`, and `nano-0.8-fp32`; local models do not inherit managed gains. A reviewed explicit `gain_db` override is available for a local model. Calibration is neither request-time loudness measurement nor dynamic normalization/limiting. See [benchmark documentation](benchmarks/README.md) for the reproducible measurement and promotion workflow and catalog provenance.
 
 ```python
 from kittensynth import KittenVoice

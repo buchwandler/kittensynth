@@ -4,6 +4,13 @@ import math
 
 from kittensynth.voice_level import VoiceCalibrationKey, default_voice_calibration
 
+EXPECTED_MODELS = {
+    "micro-0.8",
+    "mini-0.8",
+    "nano-0.8-int8",
+    "nano-0.8-fp32",
+}
+
 EXPECTED_INTERNAL_VOICES = {
     "expr-voice-2-f",
     "expr-voice-2-m",
@@ -25,9 +32,13 @@ def test_packaged_voice_calibration_catalog_loads():
     assert catalog.reference_lufs == -24.0
     assert len(catalog.revision or "") == 64
     expected_keys = {
-        VoiceCalibrationKey("kitten", "nano-0.8-int8", voice) for voice in EXPECTED_INTERNAL_VOICES
+        VoiceCalibrationKey("kitten", model, voice)
+        for model in EXPECTED_MODELS
+        for voice in EXPECTED_INTERNAL_VOICES
     }
     assert set(catalog.voices) == expected_keys
+    assert len(catalog.voices) == 32
+    assert not any(key.model_id == "nano-0.8" for key in catalog.voices)
 
     for record in catalog.voices.values():
         assert math.isfinite(record.gain_db)

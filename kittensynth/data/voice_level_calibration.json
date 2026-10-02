@@ -2,7 +2,7 @@
   "corpus": "kittensynth-prepared-speech-v1",
   "generated_with": {
     "audiosig": "0.1.6",
-    "kitteng2p": "0.1.1",
+    "kitteng2p": "0.1.dev1+g3caf05c9b.d19800101",
     "kittensynth": "0.1.0",
     "onnxvoice": "0.2.0"
   },
@@ -10,74 +10,290 @@
   "reference_lufs": -24.0,
   "schema": 1,
   "voices": {
+    "kitten:micro-0.8:expr-voice-2-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -3.622484581380405,
+      "mad_lu": 0.010376230325480407,
+      "measured_lufs": -20.377515418619595,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:micro-0.8:expr-voice-2-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -3.899986313191551,
+      "mad_lu": 0.017880279813599742,
+      "measured_lufs": -20.10001368680845,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:micro-0.8:expr-voice-3-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -3.4639331026706337,
+      "mad_lu": 0.021706205552714408,
+      "measured_lufs": -20.536066897329366,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:micro-0.8:expr-voice-3-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -5.442572130509969,
+      "mad_lu": 0.0116026459479599,
+      "measured_lufs": -18.55742786949003,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:micro-0.8:expr-voice-4-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -3.301926948346953,
+      "mad_lu": 0.012299671076327456,
+      "measured_lufs": -20.698073051653047,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:micro-0.8:expr-voice-4-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -3.1099518787157443,
+      "mad_lu": 0.028881147572242583,
+      "measured_lufs": -20.890048121284256,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:micro-0.8:expr-voice-5-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -2.3910432794432914,
+      "mad_lu": 0.01862051535695386,
+      "measured_lufs": -21.60895672055671,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:micro-0.8:expr-voice-5-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -5.07817424530181,
+      "mad_lu": 0.009405406971289665,
+      "measured_lufs": -18.92182575469819,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:mini-0.8:expr-voice-2-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -1.1885673155854697,
+      "mad_lu": 0.016663114179692684,
+      "measured_lufs": -22.81143268441453,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:mini-0.8:expr-voice-2-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -2.8950440120114074,
+      "mad_lu": 0.014303845207017218,
+      "measured_lufs": -21.104955987988593,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:mini-0.8:expr-voice-3-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -2.462622689648967,
+      "mad_lu": 0.007113419476624472,
+      "measured_lufs": -21.537377310351033,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:mini-0.8:expr-voice-3-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -4.6550535876291015,
+      "mad_lu": 0.00838620010922142,
+      "measured_lufs": -19.3449464123709,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:mini-0.8:expr-voice-4-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -2.138945736942947,
+      "mad_lu": 0.026178352298725116,
+      "measured_lufs": -21.861054263057053,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:mini-0.8:expr-voice-4-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -1.9159927119045115,
+      "mad_lu": 0.005947025159240837,
+      "measured_lufs": -22.08400728809549,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:mini-0.8:expr-voice-5-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -0.9478686520477524,
+      "mad_lu": 0.007992026352336978,
+      "measured_lufs": -23.052131347952248,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:mini-0.8:expr-voice-5-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -3.59570920189784,
+      "mad_lu": 0.0050037297397906855,
+      "measured_lufs": -20.40429079810216,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:nano-0.8-fp32:expr-voice-2-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -3.463397128002857,
+      "mad_lu": 0.01026612894278145,
+      "measured_lufs": -20.536602871997143,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:nano-0.8-fp32:expr-voice-2-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -3.588573149363331,
+      "mad_lu": 0.005230477678217937,
+      "measured_lufs": -20.41142685063667,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:nano-0.8-fp32:expr-voice-3-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -2.9701234772678227,
+      "mad_lu": 0.006834334644619133,
+      "measured_lufs": -21.029876522732177,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:nano-0.8-fp32:expr-voice-3-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -5.3611674032214935,
+      "mad_lu": 0.005489983255444031,
+      "measured_lufs": -18.638832596778506,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:nano-0.8-fp32:expr-voice-4-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -2.7858806431345684,
+      "mad_lu": 0.003949668583864252,
+      "measured_lufs": -21.21411935686543,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:nano-0.8-fp32:expr-voice-4-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -2.9230811706813498,
+      "mad_lu": 0.010292762991173987,
+      "measured_lufs": -21.07691882931865,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:nano-0.8-fp32:expr-voice-5-f": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -2.1995363018972114,
+      "mad_lu": 0.007813647395821022,
+      "measured_lufs": -21.80046369810279,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
+    "kitten:nano-0.8-fp32:expr-voice-5-m": {
+      "corpus_version": "kittensynth-prepared-speech-v1",
+      "gain_db": -5.272951176219969,
+      "mad_lu": 0.006182233011490013,
+      "measured_lufs": -18.72704882378003,
+      "method": "bs1770",
+      "reference_lufs": -24.0,
+      "samples": 9
+    },
     "kitten:nano-0.8-int8:expr-voice-2-f": {
       "corpus_version": "kittensynth-prepared-speech-v1",
-      "gain_db": -1.536165457381518,
-      "mad_lu": 0.023182303249143388,
-      "measured_lufs": -22.463834542618482,
+      "gain_db": -1.700247963998514,
+      "mad_lu": 0.036537070350171064,
+      "measured_lufs": -22.299752036001486,
       "method": "bs1770",
       "reference_lufs": -24.0,
       "samples": 9
     },
     "kitten:nano-0.8-int8:expr-voice-2-m": {
       "corpus_version": "kittensynth-prepared-speech-v1",
-      "gain_db": -1.8948731347321477,
-      "mad_lu": 0.0225602894357948,
-      "measured_lufs": -22.105126865267852,
+      "gain_db": -1.8165893502459198,
+      "mad_lu": 0.03349676938801949,
+      "measured_lufs": -22.18341064975408,
       "method": "bs1770",
       "reference_lufs": -24.0,
       "samples": 9
     },
     "kitten:nano-0.8-int8:expr-voice-3-f": {
       "corpus_version": "kittensynth-prepared-speech-v1",
-      "gain_db": -2.3965692664821567,
-      "mad_lu": 0.01746149077365189,
-      "measured_lufs": -21.603430733517843,
+      "gain_db": -2.3452640729932988,
+      "mad_lu": 0.034329768903326396,
+      "measured_lufs": -21.6547359270067,
       "method": "bs1770",
       "reference_lufs": -24.0,
       "samples": 9
     },
     "kitten:nano-0.8-int8:expr-voice-3-m": {
       "corpus_version": "kittensynth-prepared-speech-v1",
-      "gain_db": -4.227888578617435,
-      "mad_lu": 0.026941068683495217,
-      "measured_lufs": -19.772111421382565,
+      "gain_db": -4.045188307719545,
+      "mad_lu": 0.01565071392906603,
+      "measured_lufs": -19.954811692280455,
       "method": "bs1770",
       "reference_lufs": -24.0,
       "samples": 9
     },
     "kitten:nano-0.8-int8:expr-voice-4-f": {
       "corpus_version": "kittensynth-prepared-speech-v1",
-      "gain_db": -1.861306434790638,
-      "mad_lu": 0.04325559546849789,
-      "measured_lufs": -22.138693565209362,
+      "gain_db": -1.9182398527863143,
+      "mad_lu": 0.013950172302212849,
+      "measured_lufs": -22.081760147213686,
       "method": "bs1770",
       "reference_lufs": -24.0,
       "samples": 9
     },
     "kitten:nano-0.8-int8:expr-voice-4-m": {
       "corpus_version": "kittensynth-prepared-speech-v1",
-      "gain_db": -1.8017896996735452,
-      "mad_lu": 0.05912969421103398,
-      "measured_lufs": -22.198210300326455,
+      "gain_db": -1.8062717903186645,
+      "mad_lu": 0.03967878335195607,
+      "measured_lufs": -22.193728209681336,
       "method": "bs1770",
       "reference_lufs": -24.0,
       "samples": 9
     },
     "kitten:nano-0.8-int8:expr-voice-5-f": {
       "corpus_version": "kittensynth-prepared-speech-v1",
-      "gain_db": -1.2582934826089698,
-      "mad_lu": 0.014703265328954274,
-      "measured_lufs": -22.74170651739103,
+      "gain_db": -1.3303283071117349,
+      "mad_lu": 0.05700803206734406,
+      "measured_lufs": -22.669671692888265,
       "method": "bs1770",
       "reference_lufs": -24.0,
       "samples": 9
     },
     "kitten:nano-0.8-int8:expr-voice-5-m": {
       "corpus_version": "kittensynth-prepared-speech-v1",
-      "gain_db": -4.152453973025782,
-      "mad_lu": 0.04653075764329273,
-      "measured_lufs": -19.847546026974218,
+      "gain_db": -4.105682634162903,
+      "mad_lu": 0.038285135411690874,
+      "measured_lufs": -19.894317365837097,
       "method": "bs1770",
       "reference_lufs": -24.0,
       "samples": 9

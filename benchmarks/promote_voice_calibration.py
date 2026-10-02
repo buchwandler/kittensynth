@@ -466,9 +466,55 @@ def build_candidate(
     return candidate, counts
 
 
+def build_candidate_from_reports(
+    reports: Sequence[Mapping[str, Any]],
+    *,
+    allow_partial: bool = False,
+    include_high_variability: bool = False,
+    allow_peak_risk: bool = False,
+    allow_gain_limited: bool = False,
+) -> tuple[dict[str, Any], dict[str, int]]:
+    """Validate and merge disjoint candidate catalogs from several reports."""
+    if not reports:
+        raise ValueError("at least one measurement report is required")
+
+    candidate: dict[str, Any] | None = None
+    counts = {"eligible": 0, "high_variability": 0, "incomplete": 0}
+    metadata_fields = ("schema", "method", "corpus", "reference_lufs", "generated_with")
+    for report in reports:
+        next_candidate, next_counts = build_candidate(
+            report,
+            allow_partial=allow_partial,
+            include_high_variability=include_high_variability,
+            allow_peak_risk=allow_peak_risk,
+            allow_gain_limited=allow_gain_limited,
+        )
+        if candidate is None:
+            candidate = next_candidate
+        else:
+            for field in metadata_fields:
+                if candidate[field] != next_candidate[field]:
+                    raise ValueError(f"measurement reports have mismatched {field}")
+            duplicates = set(candidate["voices"]) & set(next_candidate["voices"])
+            if duplicates:
+                raise ValueError(
+                    f"duplicate calibration key across reports: {sorted(duplicates)[0]}"
+                )
+            candidate["voices"].update(next_candidate["voices"])
+        for name, count in next_counts.items():
+            counts[name] += count
+
+    if candidate is None:
+        raise ValueError("at least one measurement report is required")
+    candidate["voices"] = dict(sorted(candidate["voices"].items()))
+    return candidate, counts
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("report", nargs="?", type=Path, default=DEFAULT_INPUT)
+    parser.add_argument(
+        "reports", nargs="*", type=Path, help="measurement report JSON files to merge"
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--allow-partial", action="store_true")
     parser.add_argument("--include-high-variability", action="store_true")
@@ -480,17 +526,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    report_paths = args.reports or [DEFAULT_INPUT]
     output = args.output.resolve()
     if output == PRODUCTION_CATALOG.resolve():
         raise SystemExit("promotion never writes directly to the packaged production catalog")
-    if output == args.report.resolve():
-        raise SystemExit("candidate output must not overwrite the measurement report")
+    if any(output == report_path.resolve() for report_path in report_paths):
+        raise SystemExit("candidate output must not overwrite a measurement report")
     try:
-        report = json.loads(args.report.read_text(encoding="utf-8"))
-        if not isinstance(report, Mapping):
-            raise ValueError("measurement report must contain a JSON object")
-        candidate, counts = build_candidate(
-            report,
+        reports = []
+        for report_path in report_paths:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            if not isinstance(report, Mapping):
+                raise ValueError(f"measurement report must contain a JSON object: {report_path}")
+            reports.append(report)
+        candidate, counts = build_candidate_from_reports(
+            reports,
             allow_partial=args.allow_partial,
             include_high_variability=args.include_high_variability,
             allow_peak_risk=args.allow_peak_risk,
