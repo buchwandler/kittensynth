@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import pytest
 from kitteng2p.types import PhonemizeResult
 
 from kittensynth import KittenVoice, SynthesisConfig, VoiceLevelConfig
@@ -193,4 +194,33 @@ def test_explicit_config_speed_remains_authoritative(tmp_path):
     )
 
     assert result.speed == 1.6
+    model.close()
+
+
+def test_runtime_close_failure_still_closes_owned_g2p(tmp_path, monkeypatch):
+    voices_path = tmp_path / "voices.npz"
+    make_voices(voices_path)
+    runtime = FakeRuntime()
+    owned_g2p = FakeG2P()
+    monkeypatch.setattr("kittensynth.voice.KittenG2P", lambda: owned_g2p)
+
+    def fail_close():
+        runtime.closed = True
+        raise RuntimeError("runtime close failed")
+
+    runtime.close = fail_close
+    model = KittenVoice(
+        runtime=runtime,
+        voices_path=voices_path,
+        metadata={},
+        model_ref=None,
+    )
+
+    with pytest.raises(RuntimeError, match="runtime close failed"):
+        model.close()
+
+    assert runtime.closed
+    assert owned_g2p.closed
+    with pytest.raises(RuntimeError, match="KittenVoice is closed"):
+        model.synthesize_prepared("hello")
     model.close()

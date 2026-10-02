@@ -1,89 +1,77 @@
-#!/usr/bin/env python
-"""
-Script to build documentation for kittensynth.
+#!/usr/bin/env python3
+"""Build the KittenSynth documentation with warning-as-error checks."""
 
-This script builds the Sphinx documentation for the kittensynth package.
-It can be run using:
-    python docs/make.py [option]
+from __future__ import annotations
 
-Options:
-    clean   - clean the build directory
-    html    - build HTML documentation
-    dirhtml - build HTML documentation with directory structure
-    all     - build all documentation formats
-    help    - show help message
-"""
-
-import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Sequence
+from pathlib import Path
+
+DOCS_DIR = Path(__file__).resolve().parent
+SOURCE_DIR = DOCS_DIR
+BUILD_DIR = DOCS_DIR / "_build"
+VALID_TARGETS = {
+    "html",
+    "dirhtml",
+    "latex",
+    "latexpdf",
+    "text",
+    "man",
+    "changes",
+    "linkcheck",
+    "doctest",
+    "all",
+}
 
 
-def main():
-    """Run the script."""
-    sphinx_build = "sphinx-build"
-
-    # Determine if we're being run from docs/ or from project root
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    if os.path.basename(script_dir) == "docs":
-        # Running from docs directory
-        build_dir = "_build"
-        source_dir = "."
-    else:
-        # Running from project root
-        build_dir = os.path.join("docs", "_build")
-        source_dir = "docs"
-
-    target = "html" if len(sys.argv) < 2 else sys.argv[1]
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run Sphinx for a target, independent of the caller's working directory."""
+    args = list(sys.argv[1:] if argv is None else argv)
+    target = args[0] if args else "html"
 
     if target == "clean":
-        if os.path.exists(build_dir):
-            print(f"Cleaning {build_dir}...")
-            shutil.rmtree(build_dir)
+        if BUILD_DIR.exists():
+            print(f"Cleaning {BUILD_DIR}...")
+            shutil.rmtree(BUILD_DIR)
         return 0
-
     if target == "help":
         print(__doc__)
+        print("Targets: " + ", ".join(sorted(VALID_TARGETS | {"clean", "help"})))
         return 0
-
-    if not os.path.exists(build_dir):
-        os.makedirs(build_dir)
-
-    # Set of valid targets
-    valid_targets = {
-        "html",
-        "dirhtml",
-        "latex",
-        "latexpdf",
-        "text",
-        "man",
-        "changes",
-        "linkcheck",
-        "doctest",
-        "all",
-    }
-
-    if target not in valid_targets:
+    if target not in VALID_TARGETS:
         print(f"Unknown target: {target}")
         print("Use 'help' target for help")
         return 1
 
-    if target == "all":
-        # Build all formats
-        for fmt in ["html", "dirhtml", "latex"]:
-            cmd = [sphinx_build, "-b", fmt, source_dir, os.path.join(build_dir, fmt)]
-            print(f"Building {fmt} documentation...")
-            subprocess.run(cmd, check=True)
-    else:
-        # Build specific format
-        cmd = [sphinx_build, "-b", target, source_dir, os.path.join(build_dir, target)]
-        print(f"Building {target} documentation...")
-        subprocess.run(cmd, check=True)
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    formats = ("html", "dirhtml", "latex") if target == "all" else (target,)
+    for format_name in formats:
+        print(f"Building {format_name} documentation...")
+        if format_name == "latexpdf":
+            command = [
+                "sphinx-build",
+                "-W",
+                "-M",
+                format_name,
+                str(SOURCE_DIR),
+                str(BUILD_DIR),
+            ]
+        else:
+            command = [
+                "sphinx-build",
+                "-W",
+                "-b",
+                format_name,
+                str(SOURCE_DIR),
+                str(BUILD_DIR / format_name),
+            ]
+        subprocess.run(command, check=True)
 
-    print(f"Build finished. Documentation is in {os.path.join(build_dir, target)}")
+    print(f"Build finished. Documentation is in {BUILD_DIR}")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

@@ -115,7 +115,7 @@ def open_installed_model(
     resolved: ResolvedKittenModel,
     *,
     providers: Sequence[Any] | str | None = None,
-    provider_options: Mapping[str, Any] | None = None,
+    provider_options: Sequence[dict[str, Any]] | dict[str, dict[str, Any]] | None = None,
     session_options: Any | None = None,
     cache_dir: str | Path | None = None,
     offline: bool = False,
@@ -143,7 +143,7 @@ def open_local_model(
     voices_path: str | Path,
     metadata: Mapping[str, Any],
     providers: Sequence[Any] | str | None = None,
-    provider_options: Mapping[str, Any] | None = None,
+    provider_options: Sequence[dict[str, Any]] | dict[str, dict[str, Any]] | None = None,
     session_options: Any | None = None,
 ) -> Any:
     module = _module()

@@ -2,6 +2,29 @@
 
 KittenTTS synthesis layer built on **kitteng2p + OnnxVoice**.
 
+## Installation
+
+A base `pip install kittensynth` is provider-neutral and does not install ONNX Runtime. For CPU inference, install the CPU provider extra:
+
+```bash
+python -m pip install "kittensynth[cpu]"
+```
+
+For GPU inference or the bundled G2P runtime, use:
+
+```bash
+python -m pip install "kittensynth[gpu]"
+python -m pip install "kittensynth[cpu,bundled-g2p]"
+```
+
+Managed examples require an ONNX Runtime provider and a working G2P runtime. The CPU plus bundled G2P command above is the copy/paste setup for the examples.
+
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [OnnxVoice contract](docs/onnxvoice-contract.md)
+- [Calibration and benchmark methodology](benchmarks/README.md)
+
 This MVP follows the same repository/package shape as PiperSynth/PiperG2P:
 
 ```text
@@ -44,13 +67,11 @@ float32 waveform
 
 ## Required OnnxVoice contract
 
-A future/updated OnnxVoice release must register:
+KittenSynth requires OnnxVoice 0.2.x. OnnxVoice 0.2.0 and later in that supported range register the built-in Kitten adapter and expose:
 
 ```text
 system = kitten
 ```
-
-and expose:
 
 ```python
 runtime.infer(token_ids, style=style, speed=effective_speed)
@@ -80,6 +101,18 @@ with KittenVoice.from_pretrained("nano-0.8-int8") as model:
 
 ## Local model
 
+```python
+from kittensynth import KittenVoice
+
+with KittenVoice.from_local(
+    model_path="kitten_tts_nano_v0_8.onnx",
+    voices_path="voices.npz",
+    config_path="config.json",
+) as model:
+    result = model.synthesize_prepared("Local synthesis.", voice="Bella")
+    result.save_wav("local.wav")
+```
+
 ## Examples
 
 Run the prepared-speech examples with a managed Kitten model:
@@ -107,19 +140,30 @@ with KittenVoice.from_pretrained("nano-0.8-int8") as model:
     result = model.synthesize_prepared("Prepared speech.", voice="Jasper", config=config)
 ```
 
-Catalog lookup uses the exact managed model ID and internal voice/style ID, not the friendly alias. The packaged measured catalog covers all eight internal voices for `micro-0.8`, `mini-0.8`, `nano-0.8-int8`, and `nano-0.8-fp32`; local models do not inherit managed gains. A reviewed explicit `gain_db` override is available for a local model. Calibration is neither request-time loudness measurement nor dynamic normalization/limiting. See [benchmark documentation](benchmarks/README.md) for the reproducible measurement and promotion workflow and catalog provenance.
+### Calibration defaults by interface
+
+| Interface                                     | Default behavior                                          |
+| --------------------------------------------- | --------------------------------------------------------- |
+| Python `KittenVoice.synthesize_prepared(...)` | Calibration off                                           |
+| `examples/basic.py`                           | Calibrated                                                |
+| `examples/all_voices.py`                      | Calibrated; `--raw` disables it                           |
+| `kittensynth` CLI                             | Calibration off; use `--voice-level calibrated` to opt in |
+
+The CLI also accepts `--gain-db FLOAT` for an explicit static gain override. The API and CLI defaults remain off for backward compatibility.
+
+### Speed precedence
+
+When `config` is provided, `config.speed` is authoritative and the separate `speed=` argument is ignored:
 
 ```python
-from kittensynth import KittenVoice
-
-with KittenVoice.from_local(
-    model_path="kitten_tts_nano_v0_8.onnx",
-    voices_path="voices.npz",
-    config_path="config.json",
-) as model:
-    result = model.synthesize_prepared("Local synthesis.", voice="Bella")
-    result.save_wav("local.wav")
+model.synthesize_prepared(
+    "Prepared speech.",
+    speed=1.2,  # ignored because config is supplied
+    config=SynthesisConfig(speed=0.9),
+)
 ```
+
+Catalog lookup uses the exact managed model ID and internal voice/style ID, not the friendly alias. The packaged measured catalog covers all eight internal voices for `micro-0.8`, `mini-0.8`, `nano-0.8-int8`, and `nano-0.8-fp32`; local models do not inherit managed gains. A reviewed explicit `gain_db` override is available for a local model. Calibration is neither request-time loudness measurement nor dynamic normalization/limiting. See [benchmark documentation](benchmarks/README.md) for the reproducible measurement and promotion workflow and catalog provenance.
 
 ## Prepared-text boundary
 
@@ -158,7 +202,7 @@ min(len(text), style_rows - 1)
 Both `kitteng2p` and `kittensynth` use the same Git-tag-driven `setuptools-scm` pattern:
 
 ```bash
-git tag v0.1.0
+git tag vX.Y.Z
 python -m build
 ```
 

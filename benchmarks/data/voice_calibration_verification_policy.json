@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "name": "kittensynth-calibrated-verification-v1",
+  "reference_lufs": -24.0,
+  "max_post_calibration_abs_error_lu": 0.5,
+  "max_post_calibration_peak_dbfs": -1.0,
+  "models": ["micro-0.8", "mini-0.8", "nano-0.8-int8", "nano-0.8-fp32"],
+  "voices": ["Bella", "Jasper", "Luna", "Bruno", "Rosie", "Hugo", "Kiki", "Leo"]
+}

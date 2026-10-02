@@ -24,3 +24,7 @@ class UnsupportedModelError(KittenSynthError, RuntimeError):
 
 class OnnxVoiceContractError(KittenSynthError, RuntimeError):
     """Raised when the installed OnnxVoice lacks Kitten support."""
+
+
+class CatalogDiscoveryError(KittenSynthError, RuntimeError):
+    """Raised when the Kitten model catalog cannot be listed."""

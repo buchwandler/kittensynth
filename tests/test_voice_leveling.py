@@ -187,6 +187,44 @@ def test_matching_catalog_identity_is_applied(tmp_path):
     assert application.catalog_revision == catalog.revision
 
 
+def test_zero_db_override_is_not_reported_as_applied():
+    audio = np.array([0.1, -0.2], dtype=np.float32)
+
+    output, application = apply_voice_level_calibration(audio, VoiceLevelConfig(gain_db=0.0), None)
+
+    np.testing.assert_array_equal(output, audio)
+    assert application.source == "override"
+    assert application.gain_db == 0.0
+    assert not application.applied
+
+
+def test_zero_db_catalog_is_not_reported_as_applied(tmp_path):
+    key = VoiceCalibrationKey("kitten", "nano-0.8-int8", "expr-voice-2-m")
+    catalog = load_voice_calibration(
+        write_catalog(tmp_path, catalog_data({str(key): {"gain_db": 0.0}}))
+    )
+    audio = np.array([0.1, -0.2], dtype=np.float32)
+
+    output, application = apply_voice_level_calibration(
+        audio, VoiceLevelConfig(mode="calibrated"), key, catalog=catalog
+    )
+
+    np.testing.assert_array_equal(output, audio)
+    assert application.source == "catalog"
+    assert application.gain_db == 0.0
+    assert not application.applied
+
+
+def test_nonzero_gain_is_not_applied_when_audio_is_unchanged():
+    audio = np.zeros(2, dtype=np.float32)
+
+    output, application = apply_voice_level_calibration(audio, VoiceLevelConfig(gain_db=6.0), None)
+
+    np.testing.assert_array_equal(output, audio)
+    assert application.gain_db == 6.0
+    assert not application.applied
+
+
 def test_missing_managed_identity_leaves_audio_unchanged():
     audio = np.array([0.1, -0.2], dtype=np.float32)
 

@@ -1,4 +1,4 @@
-"""Validate wheel/sdist shape, version, and dependency boundaries."""
+"""Validate wheel/sdist contents, metadata, version, and runtime dependency boundaries."""
 
 from __future__ import annotations
 
@@ -9,23 +9,46 @@ from email.parser import Parser
 from pathlib import Path
 
 from packaging.requirements import Requirement
+from packaging.specifiers import SpecifierSet
 
 PACKAGE = "kittensynth"
-DISTRIBUTION = "kittensynth"
 FORBIDDEN = frozenset({"espeakng-loader", "phonemizer", "espeakng-runtime"})
+BASE_REQUIREMENTS = {
+    "numpy": (">=1.23", ()),
+    "kitteng2p": (">=0.1.1,<0.2", ()),
+    "onnxvoice": (">=0.2,<0.3", ()),
+    "audiosig": (">=0.1.4,<0.2", ()),
+}
+OPTIONAL_REQUIREMENTS = (
+    ("bundled-g2p", "kitteng2p", ">=0.1.1,<0.2", ("bundled",)),
+    ("cpu", "onnxvoice", ">=0.2,<0.3", ("cpu",)),
+    ("gpu", "onnxvoice", ">=0.2,<0.3", ("gpu",)),
+    ("docs", "sphinx", ">=7.0.0", ()),
+    ("docs", "myst-parser", ">=2.0.0", ()),
+    ("docs", "sphinx-rtd-theme", ">=2.0.0", ()),
+)
+
+
+def _normalize_name(name: str) -> str:
+    return name.casefold().replace("_", "-")
 
 
 def _wheel_metadata(path: Path) -> str:
     with zipfile.ZipFile(path) as archive:
-        name = next(value for value in archive.namelist() if value.endswith(".dist-info/METADATA"))
-        return archive.read(name).decode("utf-8")
+        metadata_files = [
+            name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
+        ]
+        if len(metadata_files) != 1:
+            raise SystemExit("wheel must contain exactly one dist-info/METADATA file")
+        return archive.read(metadata_files[0]).decode("utf-8")
 
 
 def _wheel_version(path: Path) -> str:
-    for row in _wheel_metadata(path).splitlines():
-        if row.startswith("Version: "):
-            return row.removeprefix("Version: ")
-    raise SystemExit("wheel metadata has no Version")
+    metadata = Parser().parsestr(_wheel_metadata(path))
+    version = metadata.get("Version")
+    if not version:
+        raise SystemExit("wheel metadata has no Version")
+    return version
 
 
 def _requirements(path: Path) -> list[Requirement]:
@@ -35,15 +58,51 @@ def _requirements(path: Path) -> list[Requirement]:
 
 def _sdist_version(path: Path) -> str:
     with tarfile.open(path, "r:gz") as archive:
-        member = next(value for value in archive.getmembers() if value.name.endswith("/PKG-INFO"))
-        handle = archive.extractfile(member)
+        members = [
+            member
+            for member in archive.getmembers()
+            if member.name.count("/") == 1 and member.name.endswith("/PKG-INFO")
+        ]
+        if len(members) != 1:
+            raise SystemExit("sdist must contain exactly one PKG-INFO file")
+        handle = archive.extractfile(members[0])
         if handle is None:
             raise SystemExit("could not read sdist PKG-INFO")
-        rows = handle.read().decode("utf-8").splitlines()
-    for row in rows:
-        if row.startswith("Version: "):
-            return row.removeprefix("Version: ")
-    raise SystemExit("sdist metadata has no Version")
+        metadata = Parser().parsestr(handle.read().decode("utf-8"))
+    version = metadata.get("Version")
+    if not version:
+        raise SystemExit("sdist PKG-INFO has no Version")
+    return version
+
+
+def _matches_extra(requirement: Requirement, extra: str | None) -> bool:
+    if requirement.marker is None:
+        return extra is None
+    return requirement.marker.evaluate({"extra": extra or ""})
+
+
+def _check_requirement(
+    requirements: list[Requirement],
+    *,
+    name: str,
+    specifier: str,
+    extras: tuple[str, ...] = (),
+    extra: str | None = None,
+) -> None:
+    candidates = [
+        requirement
+        for requirement in requirements
+        if _normalize_name(requirement.name) == name and _matches_extra(requirement, extra)
+    ]
+    description = f"{name}{f'[{extra}]' if extra else ''}{specifier}"
+    if not candidates:
+        raise SystemExit(f"wheel is missing dependency {description}")
+    expected_extras = set(extras)
+    if not any(
+        requirement.specifier == SpecifierSet(specifier) and requirement.extras == expected_extras
+        for requirement in candidates
+    ):
+        raise SystemExit(f"wheel has an incorrect dependency range or extra for {description}")
 
 
 def _check_wheel(path: Path) -> str:
@@ -51,42 +110,76 @@ def _check_wheel(path: Path) -> str:
         names = archive.namelist()
     if not any(name.startswith(PACKAGE + "/") and name.endswith(".py") for name in names):
         raise SystemExit(f"wheel does not contain {PACKAGE} Python files")
-    catalog = f"{PACKAGE}/data/voice_level_calibration.json"
-    if catalog not in names:
-        raise SystemExit("wheel is missing the packaged voice calibration catalog")
+    required_files = (
+        f"{PACKAGE}/py.typed",
+        f"{PACKAGE}/data/voice_level_calibration.json",
+    )
+    missing = [name for name in required_files if name not in names]
+    if missing:
+        raise SystemExit("wheel is missing required package files: " + ", ".join(missing))
     if any(name.startswith(("tests/", "docs/", ".github/")) for name in names):
         raise SystemExit("wheel contains development-only directories")
-    installed = {req.name.casefold().replace("_", "-") for req in _requirements(path)}
-    if "audiosig" not in installed:
-        raise SystemExit("wheel is missing the audiosig runtime dependency")
+
+    requirements = _requirements(path)
+    installed = {_normalize_name(requirement.name) for requirement in requirements}
     bad = sorted(installed & FORBIDDEN)
     if bad:
         raise SystemExit("forbidden dependencies: " + ", ".join(bad))
+    for name, (specifier, extras) in BASE_REQUIREMENTS.items():
+        _check_requirement(
+            requirements,
+            name=name,
+            specifier=specifier,
+            extras=extras,
+        )
+    for extra, name, specifier, extras in OPTIONAL_REQUIREMENTS:
+        _check_requirement(
+            requirements,
+            name=name,
+            specifier=specifier,
+            extras=extras,
+            extra=extra,
+        )
     return _wheel_version(path)
 
 
 def _check_sdist(path: Path) -> str:
     with tarfile.open(path, "r:gz") as archive:
         names = archive.getnames()
-    generated = ("benchmarks/output/", "example-artefacts/")
+    generated = ("benchmarks/output/", "docs/_build/", "example-artefacts/")
+    if any("/.ledger/" in name or name.endswith("/.ledger") for name in names):
+        raise SystemExit("sdist contains project-local ledger state")
     if any(fragment in name for fragment in generated for name in names):
-        raise SystemExit("sdist contains generated benchmark or example artifacts")
+        raise SystemExit("sdist contains generated build, benchmark, or example artifacts")
     required = (
         "pyproject.toml",
+        "MANIFEST.in",
         "README.md",
+        "CHANGELOG.md",
         "LICENSE",
+        "NOTICE",
         f"{PACKAGE}/__init__.py",
+        f"{PACKAGE}/py.typed",
         f"{PACKAGE}/data/voice_level_calibration.json",
+        "docs/index.md",
+        "docs/conf.py",
+        "docs/make.py",
+        "docs/architecture.md",
+        "docs/onnxvoice-contract.md",
+        "docs/requirements.txt",
         "examples/basic.py",
         "examples/all_voices.py",
         "examples/run_all.py",
         "benchmarks/voice_level_benchmark.py",
         "benchmarks/promote_voice_calibration.py",
+        "benchmarks/verify_voice_calibration.py",
         "benchmarks/data/voice_level_policy.json",
         "benchmarks/data/voice_level_stimuli.json",
+        "benchmarks/data/voice_calibration_verification_policy.json",
     )
-    if not all(any(name.endswith(value) for name in names) for value in required):
-        raise SystemExit("sdist is missing required project files")
+    missing = [value for value in required if not any(name.endswith(value) for name in names)]
+    if missing:
+        raise SystemExit("sdist is missing required project files: " + ", ".join(missing))
     return _sdist_version(path)
 
 

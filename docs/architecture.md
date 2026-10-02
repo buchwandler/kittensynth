@@ -30,7 +30,7 @@ runtime inference
  -> WAV conversion/clamp on save
 ```
 
-`SynthesisResult.save_wav()` clips to the PCM range. The benchmark therefore reviews predicted and measured peaks; clipping during WAV serialization is not a substitute for safe calibration. The default package mode remains off. See [`../benchmarks/README.md`](../benchmarks/README.md) for the measurement/promotion workflow and packaged catalog provenance.
+`SynthesisResult.save_wav()` clips to the PCM range. The benchmark therefore reviews predicted and measured peaks; clipping during WAV serialization is not a substitute for safe calibration. The default package mode remains off. See [benchmark documentation](https://github.com/buchwandler/kittensynth/blob/main/benchmarks/README.md) for the measurement/promotion workflow and packaged catalog provenance.
 
 ## Why G2P is separate
 

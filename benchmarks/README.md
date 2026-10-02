@@ -41,4 +41,17 @@ Report SHA-256 values for all supplied reports. The `nano-0.8` attempt failed an
 
 The merged packaged catalog SHA-256 is `ed84099411f6cf7c9607a67b496b7794f85ee8a3e693cf2df150ce94e9ae95f7`.
 
-Before release, run a second real synthesis pass with `VoiceLevelConfig(mode="calibrated")` for all 32 identities and verify the observed output loudness and peak headroom. The catalog is static: runtime synthesis applies only the stored gain for the exact managed model/internal-voice key and does not measure loudness dynamically.
+## Calibrated acceptance verification
+
+Before release, run the separate real calibrated pass across all four promoted models and eight voices per model:
+
+```bash
+python benchmarks/verify_voice_calibration.py \
+  --offline \
+  --cache-dir /path/to/model-cache \
+  --output benchmarks/output/voice_level_calibration/verification.json
+```
+
+The verifier reuses the prepared stimulus corpus and repeat count, selects `VoiceLevelConfig(mode="calibrated")`, and checks the exact catalog source, key, revision, and gain for each of the 32 identities. Policy `kittensynth-calibrated-verification-v1` targets `-24.0 LUFS`, allows at most `0.5 LU` absolute error in the median of the stimulus medians, and requires every measured sample peak to remain at or below `-1.0 dBFS`. The JSON report records package versions, stimulus and catalog hashes, catalog revision, each identity's measurements and outcome, and all failures. It exits nonzero if coverage is incomplete or any check fails. Do not use calibrated verification measurements to derive or promote gains.
+
+Runtime synthesis applies only the stored gain for the exact managed model/internal-voice key. It does not measure loudness dynamically.

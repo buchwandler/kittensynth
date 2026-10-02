@@ -263,7 +263,7 @@ def apply_voice_level_calibration(
     catalog: VoiceCalibrationCatalog | None = None,
 ) -> tuple[np.ndarray, VoiceLevelApplication]:
     """Apply one deterministic static gain; loudness is never measured here."""
-    result = np.asarray(audio, dtype=np.float32)
+    source_audio = np.asarray(audio, dtype=np.float32)
     catalog_revision = None
     if config.gain_db is not None:
         gain = float(config.gain_db)
@@ -286,9 +286,12 @@ def apply_voice_level_calibration(
             source = "catalog"
 
     if gain:
-        result = np.asarray(audiosig.apply_gain_db(result, gain, clip=False), dtype=np.float32)
+        result = np.asarray(
+            audiosig.apply_gain_db(source_audio.copy(), gain, clip=False), dtype=np.float32
+        )
     else:
-        result = result.copy()
+        result = source_audio.copy()
+    applied = bool(gain and not np.array_equal(result, source_audio))
     reasons = {
         "off": "voice-level calibration is disabled",
         "override": "an explicit gain_db override was selected",
@@ -297,7 +300,7 @@ def apply_voice_level_calibration(
         "missing_calibration": "no catalog entry matches this managed model and voice",
     }
     application = VoiceLevelApplication(
-        applied=bool(gain),
+        applied=applied,
         gain_db=gain,
         source=source,
         key=key,

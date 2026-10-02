@@ -1,5 +1,9 @@
-include README.md
+include README.md CHANGELOG.md LICENSE NOTICE
+recursive-include docs *.md *.py *.txt Makefile make.bat
 include kittensynth/data/*.json
 recursive-include examples *.py *.md
 recursive-include benchmarks *.py *.md *.json
 prune benchmarks/output
+prune docs/_build
+prune example-artefacts
+prune .ledger

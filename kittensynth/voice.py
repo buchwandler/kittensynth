@@ -63,7 +63,7 @@ class KittenVoice:
         force_download: bool = False,
         catalog_url: str | None = None,
         providers: Sequence[Any] | str | None = None,
-        provider_options: Mapping[str, Any] | None = None,
+        provider_options: Sequence[dict[str, Any]] | dict[str, dict[str, Any]] | None = None,
         session_options: Any | None = None,
         progress: Any | None = None,
         g2p: KittenG2P | None = None,
@@ -105,7 +105,7 @@ class KittenVoice:
         voices_path: str | Path,
         config_path: str | Path | None = None,
         providers: Sequence[Any] | str | None = None,
-        provider_options: Mapping[str, Any] | None = None,
+        provider_options: Sequence[dict[str, Any]] | dict[str, dict[str, Any]] | None = None,
         session_options: Any | None = None,
         g2p: KittenG2P | None = None,
     ) -> KittenVoice:
@@ -230,11 +230,15 @@ class KittenVoice:
         if self._closed:
             return
         close = getattr(self.runtime, "close", None)
-        if callable(close):
-            close()
-        if self._owns_g2p:
-            self.g2p.close()
-        self._closed = True
+        try:
+            if callable(close):
+                close()
+        finally:
+            try:
+                if self._owns_g2p:
+                    self.g2p.close()
+            finally:
+                self._closed = True
 
     def __enter__(self) -> KittenVoice:
         return self
