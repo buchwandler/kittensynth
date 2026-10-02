@@ -1,0 +1,5 @@
+include README.md
+include kittensynth/data/*.json
+recursive-include examples *.py *.md
+recursive-include benchmarks *.py *.md *.json
+prune benchmarks/output

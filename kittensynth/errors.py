@@ -10,6 +10,10 @@ class InvalidSpeedError(KittenSynthError, ValueError):
     """Raised when speed is invalid."""
 
 
+class InvalidSynthesisConfigError(KittenSynthError, ValueError):
+    """Raised when a synthesis configuration value is invalid."""
+
+
 class InvalidVoiceError(KittenSynthError, ValueError):
     """Raised when a voice is not in the active voice archive."""
 

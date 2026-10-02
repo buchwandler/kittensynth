@@ -19,6 +19,7 @@ dependencies = [
   "numpy>=1.23",
   "kitteng2p>=0.0,<0.2",
   "onnxvoice>=0.2,<0.3",
+  "audiosig>=0.1.4,<0.2",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -58,7 +59,7 @@ where = ["."]
 include = ["kittensynth*"]
 
 [tool.setuptools.package-data]
-kittensynth = ["py.typed"]
+kittensynth = ["py.typed", "data/*.json"]
 
 [tool.setuptools_scm]
 fallback_version = "0.1.dev0"

@@ -17,6 +17,11 @@ from .config import SynthesisConfig
 from .errors import EmptyTextError
 from .types import SynthesisResult, VoiceInfo
 from .voice_bank import VoiceBank
+from .voice_level import (
+    VoiceCalibrationKey,
+    VoiceLevelApplication,
+    apply_voice_level_calibration,
+)
 
 
 class KittenVoice:
@@ -28,10 +33,12 @@ class KittenVoice:
         metadata: Mapping[str, Any],
         model_ref: str | None,
         g2p: KittenG2P | None = None,
+        model_id: str | None = None,
         sample_rate: int = 24000,
     ) -> None:
         self.runtime = runtime
         self.model_ref = model_ref
+        self.model_id = model_id
         self.metadata = dict(metadata)
         self.sample_rate = int(sample_rate)
         self._owns_g2p = g2p is None
@@ -42,6 +49,7 @@ class KittenVoice:
             speed_priors=self.metadata.get("speed_priors"),
         )
         self._closed = False
+        self._last_voice_level_application: VoiceLevelApplication | None = None
 
     @classmethod
     def from_pretrained(
@@ -84,6 +92,7 @@ class KittenVoice:
             voices_path=resolved.voices_path,
             metadata=resolved.metadata,
             model_ref=resolved.ref,
+            model_id=resolved.model_id,
             g2p=g2p,
             sample_rate=resolved.sample_rate,
         )
@@ -129,6 +138,22 @@ class KittenVoice:
             for name in self.available_voices
         )
 
+    def calibration_key(self, voice: str) -> VoiceCalibrationKey | None:
+        """Resolve a managed voice to its stable internal calibration identity."""
+        if not self.model_id:
+            return None
+        internal_voice = self.voice_bank.resolve(voice)
+        return VoiceCalibrationKey(
+            model_source="kitten",
+            model_id=self.model_id,
+            voice=internal_voice,
+        )
+
+    @property
+    def last_voice_level_application(self) -> VoiceLevelApplication | None:
+        """Return the calibration decision made for the most recent synthesis."""
+        return self._last_voice_level_application
+
     def synthesize_prepared(
         self,
         text: str,
@@ -141,12 +166,12 @@ class KittenVoice:
             raise RuntimeError("KittenVoice is closed")
         if not isinstance(text, str) or not text.strip():
             raise EmptyTextError("text must contain speakable content")
-        if config is not None:
-            speed = config.validated().speed
-
+        synthesis_config = (
+            config.validated() if config is not None else SynthesisConfig(speed=speed).validated()
+        )
         frontend = self.g2p.phonemize_prepared(text)
         style = self.voice_bank.style_for(voice, text_length=len(text))
-        effective_speed = self.voice_bank.effective_speed(voice, speed)
+        effective_speed = self.voice_bank.effective_speed(voice, synthesis_config.speed)
 
         result = self.runtime.infer(
             frontend.token_ids,
@@ -154,6 +179,15 @@ class KittenVoice:
             speed=effective_speed,
         )
         audio = np.asarray(result.audio, dtype=np.float32).reshape(-1)
+        if not np.all(np.isfinite(audio)):
+            raise ValueError("audio must be finite")
+        calibration_key = self.calibration_key(voice)
+        audio, application = apply_voice_level_calibration(
+            audio,
+            synthesis_config.voice_level,
+            calibration_key,
+        )
+        self._last_voice_level_application = application
         sample_rate = int(getattr(result, "sample_rate", 0) or self.sample_rate)
         return SynthesisResult(
             audio=audio,
@@ -166,6 +200,16 @@ class KittenVoice:
                 "token_count": len(frontend.token_ids),
                 "dropped_symbols": frontend.dropped_symbols,
                 "internal_voice": self.voice_bank.resolve(voice),
+                "model_id": self.model_id,
+                "voice_level": {
+                    "mode": application.mode,
+                    "applied": application.applied,
+                    "gain_db": application.gain_db,
+                    "source": application.source,
+                    "calibration_key": str(application.key) if application.key else None,
+                    "reason": application.reason,
+                    "catalog_revision": application.catalog_revision,
+                },
             },
         )
 

@@ -7,6 +7,18 @@ from .config import SynthesisConfig
 from .types import SynthesisResult, VoiceInfo
 from .voice import KittenVoice
 from .voice_bank import DEFAULT_VOICE_ALIASES, VoiceBank
+from .voice_level import (
+    CalibrationDataError,
+    VoiceCalibrationCatalog,
+    VoiceCalibrationKey,
+    VoiceLevelApplication,
+    VoiceLevelCalibration,
+    VoiceLevelConfig,
+    VoiceLevelMode,
+    apply_voice_level_calibration,
+    default_voice_calibration,
+    load_voice_calibration,
+)
 
 try:
     __version__ = _distribution_version("kittensynth")
@@ -21,4 +33,14 @@ __all__ = [
     "SynthesisResult",
     "VoiceBank",
     "VoiceInfo",
+    "CalibrationDataError",
+    "VoiceCalibrationCatalog",
+    "VoiceCalibrationKey",
+    "VoiceLevelApplication",
+    "VoiceLevelCalibration",
+    "VoiceLevelConfig",
+    "VoiceLevelMode",
+    "apply_voice_level_calibration",
+    "default_voice_calibration",
+    "load_voice_calibration",
 ]

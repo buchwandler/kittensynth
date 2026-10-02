@@ -51,9 +51,14 @@ def _check_wheel(path: Path) -> str:
         names = archive.namelist()
     if not any(name.startswith(PACKAGE + "/") and name.endswith(".py") for name in names):
         raise SystemExit(f"wheel does not contain {PACKAGE} Python files")
+    catalog = f"{PACKAGE}/data/voice_level_calibration.json"
+    if catalog not in names:
+        raise SystemExit("wheel is missing the packaged voice calibration catalog")
     if any(name.startswith(("tests/", "docs/", ".github/")) for name in names):
         raise SystemExit("wheel contains development-only directories")
     installed = {req.name.casefold().replace("_", "-") for req in _requirements(path)}
+    if "audiosig" not in installed:
+        raise SystemExit("wheel is missing the audiosig runtime dependency")
     bad = sorted(installed & FORBIDDEN)
     if bad:
         raise SystemExit("forbidden dependencies: " + ", ".join(bad))
@@ -63,7 +68,23 @@ def _check_wheel(path: Path) -> str:
 def _check_sdist(path: Path) -> str:
     with tarfile.open(path, "r:gz") as archive:
         names = archive.getnames()
-    required = ("pyproject.toml", "README.md", "LICENSE", f"{PACKAGE}/__init__.py")
+    generated = ("benchmarks/output/", "example-artefacts/")
+    if any(fragment in name for fragment in generated for name in names):
+        raise SystemExit("sdist contains generated benchmark or example artifacts")
+    required = (
+        "pyproject.toml",
+        "README.md",
+        "LICENSE",
+        f"{PACKAGE}/__init__.py",
+        f"{PACKAGE}/data/voice_level_calibration.json",
+        "examples/basic.py",
+        "examples/all_voices.py",
+        "examples/run_all.py",
+        "benchmarks/voice_level_benchmark.py",
+        "benchmarks/promote_voice_calibration.py",
+        "benchmarks/data/voice_level_policy.json",
+        "benchmarks/data/voice_level_stimuli.json",
+    )
     if not all(any(name.endswith(value) for name in names) for value in required):
         raise SystemExit("sdist is missing required project files")
     return _sdist_version(path)

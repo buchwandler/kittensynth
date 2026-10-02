@@ -80,6 +80,35 @@ with KittenVoice.from_pretrained("nano-0.8-int8") as model:
 
 ## Local model
 
+## Examples
+
+Run the prepared-speech examples with a managed Kitten model:
+
+```bash
+python examples/basic.py
+python examples/all_voices.py
+python examples/run_all.py --list
+```
+
+The first managed run may download model assets. Generated WAVs and the all-voices manifest are written under `example-artefacts/` and intentionally gitignored. Use `python examples/run_all.py` to execute each example in an isolated output directory and validate its WAV files.
+
+## Static voice-level calibration
+
+Calibration is an optional deterministic static gain correction. The package default remains `off` for backward compatibility; opt in explicitly:
+
+```python
+from kittensynth import KittenVoice, SynthesisConfig, VoiceLevelConfig
+
+config = SynthesisConfig(
+    speed=1.0,
+    voice_level=VoiceLevelConfig(mode="calibrated"),
+)
+with KittenVoice.from_pretrained("nano-0.8-int8") as model:
+    result = model.synthesize_prepared("Prepared speech.", voice="Jasper", config=config)
+```
+
+Catalog lookup uses the exact managed model ID and internal voice/style ID, not the friendly alias. The packaged measured catalog covers all eight internal voices for `nano-0.8-int8`; local models do not inherit managed gains. A reviewed explicit `gain_db` override is available for a local model. Calibration is neither request-time loudness measurement nor dynamic normalization/limiting. See [benchmark documentation](benchmarks/README.md) for the reproducible measurement and promotion workflow and catalog provenance.
+
 ```python
 from kittensynth import KittenVoice
 
@@ -145,4 +174,4 @@ python -m pip install -e ".[dev]"
 python -m pytest
 ```
 
-Real synthesis remains blocked until OnnxVoice contains the Kitten adapter/catalog parser.
+Managed synthesis is provided by the Kitten adapter in OnnxVoice; see the examples and static calibration sections above for runnable usage.
