@@ -7,4 +7,5 @@ KittenSynth is a prepared-text speech synthesis frontend backed by kitteng2p and
 
 architecture
 onnxvoice-contract
+changelog
 ```
