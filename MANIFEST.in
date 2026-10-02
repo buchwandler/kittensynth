@@ -1,4 +1,4 @@
-include README.md CHANGELOG.md LICENSE NOTICE
+include README.md LICENSE NOTICE docs/changelog.md
 recursive-include docs *.md *.py *.txt Makefile make.bat
 include kittensynth/data/*.json
 recursive-include examples *.py *.md

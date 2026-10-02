@@ -155,7 +155,7 @@ def _check_sdist(path: Path) -> str:
         "pyproject.toml",
         "MANIFEST.in",
         "README.md",
-        "CHANGELOG.md",
+        "docs/changelog.md",
         "LICENSE",
         "NOTICE",
         f"{PACKAGE}/__init__.py",
