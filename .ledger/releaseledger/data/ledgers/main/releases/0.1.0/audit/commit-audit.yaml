@@ -1,0 +1,177 @@
+schema_version: 1
+object_type: commit_audit_sheet
+versioning:
+  schema_version: 1
+  revision: 3
+release_version: 0.1.0
+git_base_ref: :root
+git_base_sha: 4b825dc642cb6eb9a060e54bf8d69288fbee4904
+git_head_ref: v0.1.0
+git_head_sha: a6e371a118bb120e8a3b3ac58b3bc9fae974684d
+git_range: :root..a6e371a118bb120e8a3b3ac58b3bc9fae974684d
+commit_count: 4
+rows:
+  - sha: 57d8a3f0febddd22b503cca061ac7e296bef1ea3
+    source_ref: git:57d8a3f0febddd22b503cca061ac7e296bef1ea3
+    short_sha: 57d8a3f
+    changed_paths: []
+    stats:
+      files_changed: 0
+      insertions: 0
+      deletions: 0
+    inspected: true
+    inspected_paths:
+      - .gitignore
+      - LICENSE
+      - README.md
+    observed_behavior:
+      Adds the repository license and ignore rules plus a placeholder
+      README, without product behavior.
+    public_impact: none
+    decision: internal
+    stale: false
+    evidence_subject: Initial commit
+    notes: Repository setup metadata, no product behavior; excluded from public notes.
+  - sha: 03054d47e7e499dc3d4b8430ddf39d7dc776dcb4
+    source_ref: git:03054d47e7e499dc3d4b8430ddf39d7dc776dcb4
+    short_sha: 03054d4
+    changed_paths:
+      - .codecrate.toml
+      - .github/workflows/python-publish.yml
+      - .github/workflows/test.yml
+      - .gitignore
+      - .ledger/ledger.toml
+      - .ledger/releaseledger/.ledger-project.toml
+      - .ledger/releaseledger/config.toml
+      - .ledger/releaseledger/data/.ledger-project.toml
+      - .ledger/taskledger/.ledger-project.toml
+      - .ledger/taskledger/config.toml
+      - .pre-commit-config.yaml
+      - NOTICE
+      - README.md
+      - docs/architecture.md
+      - docs/onnxvoice-contract.md
+      - kittensynth/__init__.py
+      - kittensynth/__main__.py
+      - kittensynth/_onnxvoice.py
+      - kittensynth/config.py
+      - kittensynth/errors.py
+      - kittensynth/py.typed
+      - kittensynth/types.py
+      - kittensynth/voice.py
+      - kittensynth/voice_bank.py
+      - pyproject.toml
+      - tests/test_dependency_boundary.py
+      - tests/test_types.py
+      - tests/test_version.py
+      - tests/test_voice.py
+      - tests/test_voice_bank.py
+      - tools/check_release_artifacts.py
+    stats:
+      files_changed: 31
+      insertions: 1425
+      deletions: 3
+    inspected: true
+    inspected_paths:
+      - .codecrate.toml
+      - .github/workflows/python-publish.yml
+      - .github/workflows/test.yml
+      - .gitignore
+      - .ledger/ledger.toml
+      - .ledger/releaseledger/.ledger-project.toml
+      - .ledger/releaseledger/config.toml
+      - .ledger/releaseledger/data/.ledger-project.toml
+      - .ledger/taskledger/.ledger-project.toml
+      - .ledger/taskledger/config.toml
+      - .pre-commit-config.yaml
+      - NOTICE
+      - README.md
+      - docs/architecture.md
+      - docs/onnxvoice-contract.md
+      - kittensynth/__init__.py
+      - kittensynth/__main__.py
+      - kittensynth/_onnxvoice.py
+      - kittensynth/config.py
+      - kittensynth/errors.py
+      - kittensynth/py.typed
+      - kittensynth/types.py
+      - kittensynth/voice.py
+      - kittensynth/voice_bank.py
+      - pyproject.toml
+      - tests/test_dependency_boundary.py
+      - tests/test_types.py
+      - tests/test_version.py
+      - tests/test_voice.py
+      - tests/test_voice_bank.py
+      - tools/check_release_artifacts.py
+    observed_behavior:
+      Adds the initial KittenSynth package. Callers can synthesize
+      prepared text using installed or local models, select voices and speed, invoke
+      a CLI, and save WAV output.
+    public_impact: public
+    decision: accepted
+    stale: false
+    evidence_subject: "feat: initial version"
+    target_entry_key: initial-synthesis
+    target_entry_id: entry-0001
+    notes:
+      One public entry covers the initial synthesis API and its user-facing model
+      and voice workflows.
+  - sha: 562aaf6f8fa73e7df0f04a56a9793deca460d63d
+    source_ref: git:562aaf6f8fa73e7df0f04a56a9793deca460d63d
+    short_sha: 562aaf6
+    changed_paths:
+      - .github/workflows/python-publish.yml
+      - docs/Makefile
+      - docs/conf.py
+      - docs/make.bat
+      - docs/make.py
+      - docs/requirements.txt
+      - kittensynth/_onnxvoice.py
+      - tests/test_dependency_boundary.py
+      - tests/test_voice.py
+    stats:
+      files_changed: 9
+      insertions: 347
+      deletions: 3
+    inspected: true
+    inspected_paths:
+      - .github/workflows/python-publish.yml
+      - docs/Makefile
+      - docs/conf.py
+      - docs/make.bat
+      - docs/make.py
+      - docs/requirements.txt
+      - kittensynth/_onnxvoice.py
+      - tests/test_dependency_boundary.py
+      - tests/test_voice.py
+    observed_behavior:
+      Adds Sphinx build scaffolding and makes formatting-only test
+      and import adjustments, with no user-visible runtime or API change.
+    public_impact: internal
+    decision: internal
+    stale: false
+    evidence_subject: "chore: pre-commit"
+    notes: Build tooling and formatting changes are excluded from public release notes.
+  - sha: a6e371a118bb120e8a3b3ac58b3bc9fae974684d
+    source_ref: git:a6e371a118bb120e8a3b3ac58b3bc9fae974684d
+    short_sha: a6e371a
+    changed_paths:
+      - pyproject.toml
+      - tests/test_dependency_boundary.py
+    stats:
+      files_changed: 2
+      insertions: 5
+      deletions: 1
+    inspected: true
+    inspected_paths:
+      - pyproject.toml
+      - tests/test_dependency_boundary.py
+    observed_behavior:
+      Adds a Python-version-specific TOML parser dependency for the
+      development test environment and supports Python versions without tomllib.
+    public_impact: none
+    decision: internal
+    stale: false
+    evidence_subject: "fix: tomli"
+    notes: Development-only test compatibility change, no published runtime behavior.

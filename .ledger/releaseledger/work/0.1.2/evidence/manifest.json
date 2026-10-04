@@ -1,0 +1,23 @@
+{
+  "candidate_count": 1,
+  "candidates": [
+    {
+      "additions": 2,
+      "deletions": 0,
+      "patch_file": "b41e639.patch",
+      "patch_sha256": "000892d73d4fc355476fe942b5bdc0e51cefd40c59714955cc1b992ac5066f20",
+      "paths": ["kittensynth/discovery.py", "tests/test_discovery.py"],
+      "sha": "b41e639c000c8024d061cbcbbbe3883fcc709550",
+      "short_sha": "b41e639",
+      "source_ref": "git:b41e639c000c8024d061cbcbbbe3883fcc709550"
+    }
+  ],
+  "git_base_ref": "10a4affb5b6a8bce8be9b8c3dc5465f61a56e72a",
+  "git_base_sha": "10a4affb5b6a8bce8be9b8c3dc5465f61a56e72a",
+  "git_head_ref": "b41e639c000c8024d061cbcbbbe3883fcc709550",
+  "git_head_sha": "b41e639c000c8024d061cbcbbbe3883fcc709550",
+  "include_merges": "nontrivial",
+  "object_type": "git_evidence_manifest",
+  "release_version": "0.1.2",
+  "schema_version": 1
+}

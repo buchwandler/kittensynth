@@ -1,0 +1,13 @@
+rows:
+  - sha: b41e639c000c8024d061cbcbbbe3883fcc709550
+    inspected: true
+    inspected_paths:
+      - kittensynth/discovery.py
+      - tests/test_discovery.py
+    observed_behavior: "Runtime identity diagnostics now include the installed kitteng2p distribution version, and a test verifies it."
+    public_impact: public
+    decision: accepted
+    target_entry_key: g2p-runtime-identity
+    target_entry_id: null
+    notes: "The diagnostic revision is useful for identifying the G2P dependency version at runtime."
+    stale: false

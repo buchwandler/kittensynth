@@ -1,0 +1,28 @@
+ kittensynth/discovery.py | 1 +
+ tests/test_discovery.py  | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/kittensynth/discovery.py b/kittensynth/discovery.py
+index f16fd78..0b6ad98 100644
+--- a/kittensynth/discovery.py
++++ b/kittensynth/discovery.py
+@@ -148,6 +148,7 @@ def runtime_identity(model: DiscoveredModel | None = None) -> dict[str, str | No
+     identity: dict[str, str | None] = {
+         "engine_version": _distribution_version_safe("kittensynth"),
+         "runtime_revision": _distribution_version_safe("onnxvoice"),
++        "g2p_revision": _distribution_version_safe("kitteng2p"),
+         "catalog_revision": None,
+         "model_revision": None,
+     }
+diff --git a/tests/test_discovery.py b/tests/test_discovery.py
+index 49dc48c..69df535 100644
+--- a/tests/test_discovery.py
++++ b/tests/test_discovery.py
+@@ -137,6 +137,7 @@ def test_runtime_identity_is_opaque_and_carries_revisions(monkeypatch):
+     assert identity == {
+         "engine_version": "kittensynth-1.0",
+         "runtime_revision": "onnxvoice-1.0",
++        "g2p_revision": "kitteng2p-1.0",
+         "catalog_revision": None,
+         "model_revision": None,
+     }

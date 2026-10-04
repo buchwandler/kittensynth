@@ -3,7 +3,7 @@ schema_version: 2
 object_type: release
 versioning:
   schema_version: 1
-  revision: 2
+  revision: 3
 version: 0.1.0
 status: released
 history_state: discovered
@@ -16,7 +16,7 @@ changelog_file: null
 boundary_ref: null
 source_refs: []
 source_count: null
-entry_count: 0
+entry_count: 1
 artifact_count: 0
 git_base_ref: :root
 git_base_sha: 4b825dc642cb6eb9a060e54bf8d69288fbee4904

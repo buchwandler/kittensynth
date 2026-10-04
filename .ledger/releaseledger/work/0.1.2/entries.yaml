@@ -1,0 +1,25 @@
+schema: releaseledger.entry-batch.v1
+operation: create
+schema_version: 1
+object_type: release_entry_batch
+release_version: 0.1.2
+git_base_ref: 10a4affb5b6a8bce8be9b8c3dc5465f61a56e72a
+git_base_sha: 10a4affb5b6a8bce8be9b8c3dc5465f61a56e72a
+git_head_ref: b41e639c000c8024d061cbcbbbe3883fcc709550
+git_head_sha: b41e639c000c8024d061cbcbbbe3883fcc709550
+include_merges: nontrivial
+entries:
+  - kind: added
+    summary: Added the installed kitteng2p version to runtime identity diagnostics
+    status: accepted
+    source_refs:
+      - git:b41e639c000c8024d061cbcbbbe3883fcc709550
+    paths:
+      - kittensynth/discovery.py
+      - tests/test_discovery.py
+    sources:
+      - git:b41e639c000c8024d061cbcbbbe3883fcc709550
+    prs: []
+    issues: []
+    contributors:
+      - "@holgern"
