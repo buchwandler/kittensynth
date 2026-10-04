@@ -148,6 +148,7 @@ def runtime_identity(model: DiscoveredModel | None = None) -> dict[str, str | No
     identity: dict[str, str | None] = {
         "engine_version": _distribution_version_safe("kittensynth"),
         "runtime_revision": _distribution_version_safe("onnxvoice"),
+        "g2p_revision": _distribution_version_safe("kitteng2p"),
         "catalog_revision": None,
         "model_revision": None,
     }

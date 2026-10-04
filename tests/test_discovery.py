@@ -137,6 +137,7 @@ def test_runtime_identity_is_opaque_and_carries_revisions(monkeypatch):
     assert identity == {
         "engine_version": "kittensynth-1.0",
         "runtime_revision": "onnxvoice-1.0",
+        "g2p_revision": "kitteng2p-1.0",
         "catalog_revision": None,
         "model_revision": None,
     }
