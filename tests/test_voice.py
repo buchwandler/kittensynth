@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from kitteng2p.types import PhonemizeResult
 
-from kittensynth import KittenVoice, SynthesisConfig, VoiceLevelConfig
+from kittensynth import KittenVoice, ModelInferenceError, SynthesisConfig, VoiceLevelConfig
 from kittensynth.voice_level import (
     VoiceCalibrationCatalog,
     VoiceCalibrationKey,
@@ -103,6 +103,20 @@ def test_synthesis_consumes_kitteng2p_ids_only(tmp_path):
     model.close()
     assert runtime.closed
     assert g2p.closed is False  # injected g2p is caller-owned
+
+
+def test_runtime_graph_failure_uses_model_inference_error(tmp_path):
+    model, runtime = make_model(tmp_path)
+
+    def fail_infer(*args, **kwargs):
+        raise RuntimeError("graph execution failed")
+
+    runtime.infer = fail_infer
+    with pytest.raises(ModelInferenceError, match="inference failed") as error:
+        model.synthesize_prepared("hello", voice="Jasper")
+
+    assert isinstance(error.value.__cause__, RuntimeError)
+    model.close()
 
 
 def test_managed_calibration_key_uses_internal_voice_id(tmp_path):

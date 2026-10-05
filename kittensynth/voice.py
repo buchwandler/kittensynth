@@ -14,7 +14,7 @@ from ._onnxvoice import (
     open_local_model,
 )
 from .config import SynthesisConfig
-from .errors import EmptyTextError
+from .errors import EmptyTextError, KittenSynthError, ModelInferenceError
 from .types import SynthesisResult, VoiceInfo
 from .voice_bank import VoiceBank
 from .voice_level import (
@@ -173,11 +173,16 @@ class KittenVoice:
         style = self.voice_bank.style_for(voice, text_length=len(text))
         effective_speed = self.voice_bank.effective_speed(voice, synthesis_config.speed)
 
-        result = self.runtime.infer(
-            frontend.token_ids,
-            style=style,
-            speed=effective_speed,
-        )
+        try:
+            result = self.runtime.infer(
+                frontend.token_ids,
+                style=style,
+                speed=effective_speed,
+            )
+        except KittenSynthError:
+            raise
+        except Exception as exc:
+            raise ModelInferenceError("Kitten model inference failed") from exc
         audio = np.asarray(result.audio, dtype=np.float32).reshape(-1)
         if not np.all(np.isfinite(audio)):
             raise ValueError("audio must be finite")

@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -23,6 +24,12 @@ class FakeManager:
         self.calls.append(("list_voices", system, language, refresh))
         return self.records
 
+    def install(self, *args, **kwargs):
+        raise AssertionError("discovery must not install model artifacts")
+
+    def open(self, *args, **kwargs):
+        raise AssertionError("discovery must not open model artifacts")
+
 
 def _kitten_item(**overrides):
     values = {
@@ -34,11 +41,12 @@ def _kitten_item(**overrides):
             "language": "en",
             "quality": "int8",
             "source_revision": "abc123",
+            "voice_aliases": {"Jasper": "expr-voice-2-m", "Aria": "expr-voice-2-f"},
         },
         "voices": ("Jasper", "Aria"),
         "aliases": ("nano",),
         "sample_rate": 24000,
-        "default_voice": "Jasper",
+        "default_voice": None,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -74,11 +82,28 @@ def test_discover_models_maps_catalog_items_and_voice_metadata(monkeypatch):
         ),
     )
     manager = FakeManager([item, _kitten_item(system="piper", id="piper-item")], list(records))
-    monkeypatch.setattr(discovery, "_manager", lambda **kwargs: manager)
+    manager_options = {}
 
-    models = discovery.discover_models(language="en", offline=True, refresh=True)
+    def make_manager(**kwargs):
+        manager_options.update(kwargs)
+        return manager
 
-    assert manager.calls[:2] == [
+    monkeypatch.setattr(discovery, "_manager", make_manager)
+
+    models = discovery.discover_models(
+        language="en",
+        offline=True,
+        refresh=True,
+        cache_dir="/tmp/models",
+        catalog_url="https://catalog",
+    )
+
+    assert manager_options == {
+        "cache_dir": "/tmp/models",
+        "offline": True,
+        "catalog_url": "https://catalog",
+    }
+    assert manager.calls == [
         ("list", "kitten", "en", True),
         ("list_voices", "kitten", "en", False),
     ]
@@ -92,62 +117,84 @@ def test_discover_models_maps_catalog_items_and_voice_metadata(monkeypatch):
     assert model.aliases == ("nano",)
     assert model.default_voice == "Jasper"
     assert model.source_revision == "abc123"
+    assert model.metadata["source_revision"] == "abc123"
     assert model.runtime_available is True
     assert model.voice_ids == ("Jasper", "Aria")
     assert model.voices[0].gender == "male"
     assert model.voices[0].locale == "en-us"
     assert model.voices[1].gender == "female"
     assert model.voices[1].languages == ("en", "en-us")
+    with pytest.raises(TypeError):
+        cast(Any, model.metadata)["changed"] = True
 
 
-def test_discover_models_falls_back_to_item_voice_ids(monkeypatch):
-    item = _kitten_item()
+def test_voice_aliases_get_default_english_metadata_without_gender_inference(monkeypatch):
+    item = _kitten_item(
+        voices=(),
+        metadata={"voice_aliases": {"Hugo": "voice-m", "Luna": "voice-f"}},
+    )
     monkeypatch.setattr(discovery, "_manager", lambda **kwargs: FakeManager([item], []))
+
+    model = discovery.discover_models()[0]
+
+    assert model.voice_ids == ("Hugo", "Luna")
+    assert model.voices == (
+        discovery.DescribedVoice("Hugo"),
+        discovery.DescribedVoice("Luna"),
+    )
+    assert all(voice.gender == "unknown" for voice in model.voices)
+    assert all(voice.language == "en" for voice in model.voices)
+    assert all(voice.locale == "en" for voice in model.voices)
+    assert all(voice.language_label == "English" for voice in model.voices)
+    assert all(voice.languages == ("en",) for voice in model.voices)
+    assert model.default_voice == "Hugo"
+
+
+def test_default_voice_prefers_explicit_catalog_value(monkeypatch):
+    item = _kitten_item(default_voice="Aria")
+    monkeypatch.setattr(discovery, "_manager", lambda **kwargs: FakeManager([item], []))
+
+    assert discovery.discover_models()[0].default_voice == "Aria"
+
+
+def test_default_voice_prefers_jasper_then_first_alias(monkeypatch):
+    jasper_item = _kitten_item(
+        voices=("Aria", "Jasper"),
+        metadata={"voice_aliases": {"Aria": "a", "Jasper": "j"}},
+    )
+    first_item = _kitten_item(
+        id="first",
+        voices=("Aria", "Luna"),
+        metadata={"voice_aliases": {"Aria": "a", "Luna": "l"}},
+    )
+    monkeypatch.setattr(
+        discovery, "_manager", lambda **kwargs: FakeManager([jasper_item, first_item], [])
+    )
 
     models = discovery.discover_models()
 
-    assert models[0].voices == (
-        discovery.DescribedVoice(id="Jasper"),
-        discovery.DescribedVoice(id="Aria"),
-    )
+    assert [model.default_voice for model in models] == ["Jasper", "Aria"]
 
 
-def test_discover_models_normalizes_invalid_sample_rate(monkeypatch):
-    item = _kitten_item(sample_rate=0)
+def test_discover_models_uses_safe_sample_rate_fallback(monkeypatch):
+    item = _kitten_item(sample_rate=0, metadata={"sample_rate": 22050})
     monkeypatch.setattr(discovery, "_manager", lambda **kwargs: FakeManager([item], []))
+    assert discovery.discover_models()[0].sample_rate == 22050
 
-    assert discovery.discover_models()[0].sample_rate is None
+    item = _kitten_item(sample_rate=0, metadata={})
+    monkeypatch.setattr(discovery, "_manager", lambda **kwargs: FakeManager([item], []))
+    assert discovery.discover_models()[0].sample_rate == 24000
 
 
-def test_discover_models_wraps_failures_in_catalog_discovery_error(monkeypatch):
+def test_discover_models_wraps_catalog_failures(monkeypatch):
     monkeypatch.setattr(
         discovery,
         "_manager",
         lambda **kwargs: FakeManager([], [], error=RuntimeError("catalog offline")),
     )
 
-    with pytest.raises(discovery.CatalogDiscoveryError, match="catalog offline"):
+    with pytest.raises(kittensynth.CatalogUnavailableError, match="catalog offline"):
         discovery.discover_models(offline=True)
-
-
-def test_runtime_identity_is_opaque_and_carries_revisions(monkeypatch):
-    monkeypatch.setattr(discovery, "_distribution_version_safe", lambda name: f"{name}-1.0")
-
-    identity = discovery.runtime_identity()
-    assert identity == {
-        "engine_version": "kittensynth-1.0",
-        "runtime_revision": "onnxvoice-1.0",
-        "g2p_revision": "kitteng2p-1.0",
-        "catalog_revision": None,
-        "model_revision": None,
-    }
-
-    item = _kitten_item()
-    monkeypatch.setattr(discovery, "_manager", lambda **kwargs: FakeManager([item], []))
-    model = discovery.discover_models()[0]
-    identity = discovery.runtime_identity(model)
-    assert identity["catalog_revision"] == "abc123"
-    assert identity["model_revision"] == "0.8"
 
 
 def test_discovery_api_is_exported_and_error_is_typed():
@@ -156,8 +203,8 @@ def test_discovery_api_is_exported_and_error_is_typed():
         "DescribedVoice",
         "DiscoveredModel",
         "discover_models",
-        "runtime_identity",
     ):
         assert name in kittensynth.__all__
         assert getattr(kittensynth, name) is getattr(discovery, name)
     assert issubclass(kittensynth.CatalogDiscoveryError, kittensynth.KittenSynthError)
+    assert callable(kittensynth.runtime_identity)

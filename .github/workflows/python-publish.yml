@@ -39,6 +39,15 @@ jobs:
       - run: |
           python tools/check_release_artifacts.py dist --expected-version "${{ steps.release.outputs.version }}"
           python -m twine check dist/*
+      - name: Smoke-test public API from installed wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/kittensynth-release-wheel-smoke
+          /tmp/kittensynth-release-wheel-smoke/bin/python -m pip install dist/*.whl pytest
+          cp "$GITHUB_WORKSPACE/tests/test_public_api.py" /tmp/test_public_api.py
+          cd /tmp
+          /tmp/kittensynth-release-wheel-smoke/bin/python -m pytest /tmp/test_public_api.py
       - uses: actions/upload-artifact@v4
         with:
           name: release-dists-${{ github.event.release.tag_name }}

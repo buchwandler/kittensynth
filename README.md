@@ -99,6 +99,24 @@ with KittenVoice.from_pretrained("nano-0.8-int8") as model:
     result.save_wav("hello.wav")
 ```
 
+## Public discovery and Readio adapter contract
+
+`discover_models()` exposes the OnnxVoice Kitten catalog as immutable `DiscoveredModel` and `DescribedVoice` records. It lists catalog data only: it does not install or open model artifacts. `language`, `offline`, `refresh`, `cache_dir`, and `catalog_url` are forwarded to the managed catalog layer. `source_revision` is available on each model and in its metadata; model-specific revisions belong with the model, not the global engine identity.
+
+```python
+from kittensynth import discover_models, runtime_identity
+
+models = discover_models(language="en", offline=True)
+for model in models:
+    print(model.id, model.display_name, model.voice_ids, model.default_voice)
+
+print(runtime_identity())
+```
+
+A catalog default voice takes precedence; otherwise KittenSynth selects `Jasper` when listed, then the first public alias. Catalog-provided voice metadata is preserved. When a catalog provides only `metadata.voice_aliases`, voices are described with unknown gender and English language defaults; gender is never guessed from an alias.
+
+`runtime_identity()` returns deterministic engine, KittenSynth, kitteng2p, OnnxVoice, and request-API versions. It contains no paths or machine-local state. `request_api_contract()` declares `KittenVoice.synthesize_prepared` as the current entrypoint: prepared-text boundaries remain caller-owned, and linguistic tokens, pronunciation overrides, whole-request phonemes, speakers, word timings, and request-level voice controls are not supported. The package exports typed errors such as `EmptyTextError`, `InvalidVoiceError`, `OnnxVoiceContractError`, `CatalogUnavailableError`, and `ModelInferenceError`; no Readio dependency is required.
+
 ## Local model
 
 ```python

@@ -28,3 +28,11 @@ class OnnxVoiceContractError(KittenSynthError, RuntimeError):
 
 class CatalogDiscoveryError(KittenSynthError, RuntimeError):
     """Raised when the Kitten model catalog cannot be listed."""
+
+
+class CatalogUnavailableError(CatalogDiscoveryError):
+    """Raised when the Kitten model catalog cannot be accessed or listed."""
+
+
+class ModelInferenceError(KittenSynthError, RuntimeError):
+    """Raised when the Kitten runtime fails while generating audio."""

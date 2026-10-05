@@ -46,3 +46,11 @@ runtime.infer(token_ids, style=style, speed=speed)
 
 OnnxVoice owns graph input dtype/rank validation and the upstream v0.8 `[..., :-5000]` tail
 handling needed for parity.
+
+## Public engine API and integration identity
+
+`discover_models()` is KittenSynth's catalog-only public model/voice view. It delegates listing to the OnnxVoice manager and never installs or opens model artifacts. Its frozen records expose display metadata, sample rate, public voice aliases, a deterministic default voice, source revision, and catalog metadata. An explicit catalog default wins; `Jasper` is the package fallback when present, followed by the first public alias. Voice demographics are never inferred from a voice name.
+
+The package-root `runtime_identity()` is a deterministic software identity for PCM-affecting stack versions: engine (`kitten`), KittenSynth, kitteng2p, OnnxVoice, and request API version. It does not include catalog/model revisions, cache paths, timestamps, or runtime objects; catalog/model revisions remain attached to `DiscoveredModel` metadata. `request_api_contract()` truthfully identifies `KittenVoice.synthesize_prepared` as the current API and declares unsupported capabilities false. KittenSynth does not depend on Readio.
+
+Public errors preserve failure categories: invalid requests use request-validation errors, catalog failures use `CatalogUnavailableError` (a `CatalogDiscoveryError` subtype), and graph execution failures use `ModelInferenceError`. OnnxVoice contract mismatches remain `OnnxVoiceContractError`.

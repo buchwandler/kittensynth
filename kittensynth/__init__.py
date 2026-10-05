@@ -3,23 +3,22 @@
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _distribution_version
 
+from .api_contract import REQUEST_API_VERSION, request_api_contract
 from .config import SynthesisConfig
-from .discovery import (
-    DescribedVoice,
-    DiscoveredModel,
-    discover_models,
-    runtime_identity,
-)
+from .discovery import DescribedVoice, DiscoveredModel, discover_models
 from .errors import (
     CatalogDiscoveryError,
+    CatalogUnavailableError,
     EmptyTextError,
     InvalidSpeedError,
     InvalidSynthesisConfigError,
     InvalidVoiceError,
     KittenSynthError,
+    ModelInferenceError,
     OnnxVoiceContractError,
     UnsupportedModelError,
 )
+from .identity import runtime_identity
 from .types import SynthesisResult, VoiceInfo
 from .voice import KittenVoice
 from .voice_bank import DEFAULT_VOICE_ALIASES, VoiceBank
@@ -43,8 +42,10 @@ except PackageNotFoundError:
 
 __all__ = [
     "__version__",
+    "REQUEST_API_VERSION",
     "DEFAULT_VOICE_ALIASES",
     "CatalogDiscoveryError",
+    "CatalogUnavailableError",
     "DescribedVoice",
     "DiscoveredModel",
     "EmptyTextError",
@@ -52,6 +53,7 @@ __all__ = [
     "InvalidSynthesisConfigError",
     "InvalidVoiceError",
     "KittenSynthError",
+    "ModelInferenceError",
     "KittenVoice",
     "OnnxVoiceContractError",
     "UnsupportedModelError",
@@ -69,6 +71,7 @@ __all__ = [
     "apply_voice_level_calibration",
     "default_voice_calibration",
     "discover_models",
+    "request_api_contract",
     "load_voice_calibration",
     "runtime_identity",
 ]
