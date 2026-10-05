@@ -1,0 +1,44 @@
+schema_version: 1
+object_type: commit_audit_sheet
+versioning:
+  schema_version: 1
+  revision: 1
+release_version: 0.1.3
+git_base_ref: v0.1.2
+git_base_sha: f215c7fd476604d036d7afcac754060612161509
+git_head_ref: HEAD
+git_head_sha: 801a9ec4dd8df2c0a4284e7d8d171412592c492c
+git_range: f215c7fd476604d036d7afcac754060612161509..801a9ec4dd8df2c0a4284e7d8d171412592c492c
+commit_count: 1
+rows:
+  - sha: 801a9ec4dd8df2c0a4284e7d8d171412592c492c
+    source_ref: git:801a9ec4dd8df2c0a4284e7d8d171412592c492c
+    short_sha: 801a9ec
+    changed_paths:
+      - .github/workflows/python-publish.yml
+      - .github/workflows/test.yml
+      - README.md
+      - docs/architecture.md
+      - docs/onnxvoice-contract.md
+      - kittensynth/__init__.py
+      - kittensynth/api_contract.py
+      - kittensynth/discovery.py
+      - kittensynth/errors.py
+      - kittensynth/identity.py
+      - kittensynth/voice.py
+      - tests/test_discovery.py
+      - tests/test_errors.py
+      - tests/test_identity.py
+      - tests/test_public_api.py
+      - tests/test_voice.py
+    stats:
+      files_changed: 16
+      insertions: 490
+      deletions: 124
+    inspected: false
+    inspected_paths: []
+    observed_behavior: ""
+    public_impact: unknown
+    decision: needs_review
+    stale: false
+    evidence_subject: "feat: API for readio"

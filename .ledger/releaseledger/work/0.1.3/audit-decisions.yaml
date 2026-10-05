@@ -1,0 +1,27 @@
+rows:
+  - sha: 801a9ec4dd8df2c0a4284e7d8d171412592c492c
+    inspected: true
+    inspected_paths:
+      - .github/workflows/python-publish.yml
+      - .github/workflows/test.yml
+      - README.md
+      - docs/architecture.md
+      - docs/onnxvoice-contract.md
+      - kittensynth/__init__.py
+      - kittensynth/api_contract.py
+      - kittensynth/discovery.py
+      - kittensynth/errors.py
+      - kittensynth/identity.py
+      - kittensynth/voice.py
+      - tests/test_discovery.py
+      - tests/test_errors.py
+      - tests/test_identity.py
+      - tests/test_public_api.py
+      - tests/test_voice.py
+    observed_behavior: "Adds a catalog-only public discovery surface, deterministic runtime identity and request capability metadata, typed catalog/inference errors, and matching documentation and tests."
+    public_impact: public
+    decision: accepted
+    target_entry_key: null
+    target_entry_id: null
+    notes: ""
+    stale: false
