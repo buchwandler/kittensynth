@@ -1,0 +1,33 @@
+{
+  "candidate_count": 1,
+  "candidates": [
+    {
+      "additions": 283,
+      "deletions": 11,
+      "patch_file": "bb5331d.patch",
+      "patch_sha256": "a9f6eaea0f84f07526380ad1f9cca9870a5802fbf2960d94b984f888d52f1567",
+      "paths": [
+        "README.md",
+        "docs/architecture.md",
+        "kittensynth/__init__.py",
+        "kittensynth/api_contract.py",
+        "kittensynth/types.py",
+        "kittensynth/voice.py",
+        "tests/test_public_api.py",
+        "tests/test_types.py",
+        "tests/test_voice.py"
+      ],
+      "sha": "bb5331d267b3e9027a2ab6c272e4b23607016e0c",
+      "short_sha": "bb5331d",
+      "source_ref": "git:bb5331d267b3e9027a2ab6c272e4b23607016e0c"
+    }
+  ],
+  "git_base_ref": "4af74210a338f0aae86c67d5d622589e23f0aa5c",
+  "git_base_sha": "4af74210a338f0aae86c67d5d622589e23f0aa5c",
+  "git_head_ref": "bb5331d267b3e9027a2ab6c272e4b23607016e0c",
+  "git_head_sha": "bb5331d267b3e9027a2ab6c272e4b23607016e0c",
+  "include_merges": "nontrivial",
+  "object_type": "git_evidence_manifest",
+  "release_version": "0.1.4",
+  "schema_version": 1
+}

@@ -1,0 +1,37 @@
+schema_version: 1
+object_type: commit_audit_sheet
+versioning:
+  schema_version: 1
+  revision: 1
+release_version: 0.1.4
+git_base_ref: v0.1.3
+git_base_sha: 4af74210a338f0aae86c67d5d622589e23f0aa5c
+git_head_ref: HEAD
+git_head_sha: bb5331d267b3e9027a2ab6c272e4b23607016e0c
+git_range: 4af74210a338f0aae86c67d5d622589e23f0aa5c..bb5331d267b3e9027a2ab6c272e4b23607016e0c
+commit_count: 1
+rows:
+  - sha: bb5331d267b3e9027a2ab6c272e4b23607016e0c
+    source_ref: git:bb5331d267b3e9027a2ab6c272e4b23607016e0c
+    short_sha: bb5331d
+    changed_paths:
+      - README.md
+      - docs/architecture.md
+      - kittensynth/__init__.py
+      - kittensynth/api_contract.py
+      - kittensynth/types.py
+      - kittensynth/voice.py
+      - tests/test_public_api.py
+      - tests/test_types.py
+      - tests/test_voice.py
+    stats:
+      files_changed: 9
+      insertions: 283
+      deletions: 11
+    inspected: false
+    inspected_paths: []
+    observed_behavior: ""
+    public_impact: unknown
+    decision: needs_review
+    stale: false
+    evidence_subject: "feat: add meaurement api"

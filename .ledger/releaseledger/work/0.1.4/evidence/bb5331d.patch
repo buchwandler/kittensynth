@@ -1,0 +1,473 @@
+ README.md                   | 16 ++++++++-
+ docs/architecture.md        | 14 ++++++++
+ kittensynth/__init__.py     |  3 +-
+ kittensynth/api_contract.py |  3 ++
+ kittensynth/types.py        | 52 +++++++++++++++++++++++++++-
+ kittensynth/voice.py        | 25 ++++++++++----
+ tests/test_public_api.py    | 26 ++++++++++++++
+ tests/test_types.py         | 71 +++++++++++++++++++++++++++++++++++++-
+ tests/test_voice.py         | 84 ++++++++++++++++++++++++++++++++++++++++++++-
+ 9 files changed, 283 insertions(+), 11 deletions(-)
+
+diff --git a/README.md b/README.md
+index 6a04ac4..4e20fc5 100644
+--- a/README.md
++++ b/README.md
+@@ -115,7 +115,21 @@ print(runtime_identity())
+
+ A catalog default voice takes precedence; otherwise KittenSynth selects `Jasper` when listed, then the first public alias. Catalog-provided voice metadata is preserved. When a catalog provides only `metadata.voice_aliases`, voices are described with unknown gender and English language defaults; gender is never guessed from an alias.
+
+-`runtime_identity()` returns deterministic engine, KittenSynth, kitteng2p, OnnxVoice, and request-API versions. It contains no paths or machine-local state. `request_api_contract()` declares `KittenVoice.synthesize_prepared` as the current entrypoint: prepared-text boundaries remain caller-owned, and linguistic tokens, pronunciation overrides, whole-request phonemes, speakers, word timings, and request-level voice controls are not supported. The package exports typed errors such as `EmptyTextError`, `InvalidVoiceError`, `OnnxVoiceContractError`, `CatalogUnavailableError`, and `ModelInferenceError`; no Readio dependency is required.
++`runtime_identity()` returns deterministic engine, KittenSynth, kitteng2p, OnnxVoice, and request-API versions. It contains no paths or machine-local state. `request_api_contract()` declares `KittenVoice.synthesize_prepared` as the synthesis entrypoint and advertises `KittenVoice.measure_prepared` for exact `model_tokens` request measurement; prepared-text boundaries remain caller-owned, and linguistic tokens, pronunciation overrides, whole-request phonemes, speakers, word timings, and request-level voice controls are not supported. The package exports typed errors such as `EmptyTextError`, `InvalidVoiceError`, `OnnxVoiceContractError`, `CatalogUnavailableError`, and `ModelInferenceError`; no Readio dependency is required.
++
++## Measure prepared input without inference
++
++`KittenVoice.measure_prepared(text)` runs the same KittenG2P prepared-text frontend used by synthesis and returns the exact number of model token IDs without running acoustic ONNX inference:
++
++```python
++from kittensynth import KittenVoice
++
++with KittenVoice.from_pretrained("nano-0.8-int8") as model:
++    measure = model.measure_prepared("Prepared speakable text.")
++    print(measure.token_count, measure.max_tokens, measure.fits)
++```
++
++`max_tokens=None` means KittenSynth has no declared hard maximum for the active model; it does not mean the model has infinite capacity. The request API reports the exact amount in `model_tokens`, with `fits=None` while the maximum is unknown. KittenSynth does not split or retry requests during measurement.
+
+ ## Local model
+
+diff --git a/docs/architecture.md b/docs/architecture.md
+index 82c680e..4c7b4e8 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -18,6 +18,20 @@
+ | BS.1770 calibration measurement tooling     | `benchmarks` / `audiosig`        |
+ | final program loudness / mastering          | caller                           |
+
++## Exact request measurement
++
++Prepared-text measurement belongs to KittenSynth at the model-input boundary. It uses the same KittenG2P transformation as synthesis and stops before acoustic inference:
++
++```text
++prepared text
++  -> KittenG2P
++  -> token_ids
++  -> measurement boundary (exact model_tokens count)
++  -> ONNX inference
++```
++
++`KittenVoice.measure_prepared(text)` returns `len(frontend.token_ids)` and never invokes ONNX inference. The current model catalog declares no authoritative hard token maximum, so the result uses `max_tokens=None` and `fits=None`. Unknown capacity is not infinite capacity; KittenSynth does not guess a maximum, split the request, or retry inference.
++
+ ## Static voice-level correction
+
+ Runtime calibration is an opt-in static gain lookup keyed by the exact managed model ID and Kitten internal voice/style ID. It never infers a managed identity for local models, measures loudness during synthesis, or performs dynamic normalization. The audio path is:
+diff --git a/kittensynth/__init__.py b/kittensynth/__init__.py
+index 970c147..7803699 100644
+--- a/kittensynth/__init__.py
++++ b/kittensynth/__init__.py
+@@ -19,7 +19,7 @@ from .errors import (
+     UnsupportedModelError,
+ )
+ from .identity import runtime_identity
+-from .types import SynthesisResult, VoiceInfo
++from .types import SynthesisMeasure, SynthesisResult, VoiceInfo
+ from .voice import KittenVoice
+ from .voice_bank import DEFAULT_VOICE_ALIASES, VoiceBank
+ from .voice_level import (
+@@ -58,6 +58,7 @@ __all__ = [
+     "OnnxVoiceContractError",
+     "UnsupportedModelError",
+     "SynthesisConfig",
++    "SynthesisMeasure",
+     "SynthesisResult",
+     "VoiceBank",
+     "VoiceInfo",
+diff --git a/kittensynth/api_contract.py b/kittensynth/api_contract.py
+index 70b8f1b..758db74 100644
+--- a/kittensynth/api_contract.py
++++ b/kittensynth/api_contract.py
+@@ -17,6 +17,9 @@ _REQUEST_API_CONTRACT: Mapping[str, str | bool] = MappingProxyType(
+         "supports_word_timings": False,
+         "supports_voice_level": False,
+         "caller_owns_text_boundaries": True,
++        "supports_request_measurement": True,
++        "measurement_entrypoint": "KittenVoice.measure_prepared",
++        "measurement_metric": "model_tokens",
+     }
+ )
+
+diff --git a/kittensynth/types.py b/kittensynth/types.py
+index 9123a65..72499a3 100644
+--- a/kittensynth/types.py
++++ b/kittensynth/types.py
+@@ -1,8 +1,11 @@
+ from __future__ import annotations
+
++import math
+ import wave
+-from dataclasses import dataclass
++from collections.abc import Mapping
++from dataclasses import dataclass, field
+ from pathlib import Path
++from types import MappingProxyType
+ from typing import Any
+
+ import numpy as np
+@@ -45,3 +48,50 @@ class SynthesisResult:
+             handle.setsampwidth(2)
+             handle.setframerate(self.sample_rate)
+             handle.writeframes(pcm.tobytes())
++
++
++@dataclass(frozen=True, slots=True)
++class SynthesisMeasure:
++    """Exact model-input measurement for a prepared synthesis request."""
++
++    token_count: int
++    max_tokens: int | None
++    fits: bool | None
++    model_id: str | None = None
++    metadata: Mapping[str, Any] = field(default_factory=dict)
++
++    def __post_init__(self) -> None:
++        if (
++            isinstance(self.token_count, bool)
++            or not isinstance(self.token_count, int)
++            or self.token_count < 0
++        ):
++            raise ValueError("token_count must be a non-negative integer")
++
++        if self.max_tokens is not None and (
++            isinstance(self.max_tokens, bool)
++            or not isinstance(self.max_tokens, int)
++            or self.max_tokens <= 0
++        ):
++            raise ValueError("max_tokens must be a positive integer or None")
++
++        if self.fits is not None and not isinstance(self.fits, bool):
++            raise ValueError("fits must be a bool or None")
++        expected_fits = None if self.max_tokens is None else self.token_count <= self.max_tokens
++        if self.fits is not expected_fits:
++            raise ValueError("fits must match token_count and max_tokens")
++
++        if self.model_id is not None and not isinstance(self.model_id, str):
++            raise ValueError("model_id must be a string or None")
++
++        if not isinstance(self.metadata, Mapping):
++            raise ValueError("metadata must be a mapping")
++        metadata = dict(self.metadata)
++        for key, value in metadata.items():
++            if not isinstance(key, str):
++                raise ValueError("metadata keys must be strings")
++            if value is not None and type(value) not in (str, bool, int, float):
++                raise ValueError("metadata values must be JSON-friendly scalars")
++            if isinstance(value, float) and not math.isfinite(value):
++                raise ValueError("metadata float values must be finite")
++        object.__setattr__(self, "metadata", MappingProxyType(metadata))
+diff --git a/kittensynth/voice.py b/kittensynth/voice.py
+index 3157ffb..b7ebe12 100644
+--- a/kittensynth/voice.py
++++ b/kittensynth/voice.py
+@@ -15,7 +15,7 @@ from ._onnxvoice import (
+ )
+ from .config import SynthesisConfig
+ from .errors import EmptyTextError, KittenSynthError, ModelInferenceError
+-from .types import SynthesisResult, VoiceInfo
++from .types import SynthesisMeasure, SynthesisResult, VoiceInfo
+ from .voice_bank import VoiceBank
+ from .voice_level import (
+     VoiceCalibrationKey,
+@@ -154,6 +154,23 @@ class KittenVoice:
+         """Return the calibration decision made for the most recent synthesis."""
+         return self._last_voice_level_application
+
++    def _prepare_text(self, text: str) -> Any:
++        if self._closed:
++            raise RuntimeError("KittenVoice is closed")
++        if not isinstance(text, str) or not text.strip():
++            raise EmptyTextError("text must contain speakable content")
++        return self.g2p.phonemize_prepared(text)
++
++    def measure_prepared(self, text: str) -> SynthesisMeasure:
++        """Measure exact Kitten model tokens without acoustic inference."""
++        frontend = self._prepare_text(text)
++        return SynthesisMeasure(
++            token_count=len(frontend.token_ids),
++            max_tokens=None,
++            fits=None,
++            model_id=self.model_id,
++        )
++
+     def synthesize_prepared(
+         self,
+         text: str,
+@@ -162,14 +179,10 @@ class KittenVoice:
+         speed: float = 1.0,
+         config: SynthesisConfig | None = None,
+     ) -> SynthesisResult:
+-        if self._closed:
+-            raise RuntimeError("KittenVoice is closed")
+-        if not isinstance(text, str) or not text.strip():
+-            raise EmptyTextError("text must contain speakable content")
++        frontend = self._prepare_text(text)
+         synthesis_config = (
+             config.validated() if config is not None else SynthesisConfig(speed=speed).validated()
+         )
+-        frontend = self.g2p.phonemize_prepared(text)
+         style = self.voice_bank.style_for(voice, text_length=len(text))
+         effective_speed = self.voice_bank.effective_speed(voice, synthesis_config.speed)
+
+diff --git a/tests/test_public_api.py b/tests/test_public_api.py
+index 0bac837..00ab4d0 100644
+--- a/tests/test_public_api.py
++++ b/tests/test_public_api.py
+@@ -1,3 +1,5 @@
++import subprocess
++import sys
+ from typing import Any, cast
+
+ import kittensynth
+@@ -8,6 +10,7 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
+         "KittenVoice",
+         "SynthesisConfig",
+         "SynthesisResult",
++        "SynthesisMeasure",
+         "discover_models",
+         "runtime_identity",
+     )
+@@ -23,6 +26,7 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
+     assert all(hasattr(kittensynth, name) for name in (*required, *required_errors))
+     assert all(name in kittensynth.__all__ for name in (*required, *required_errors))
+     assert callable(kittensynth.KittenVoice.synthesize_prepared)
++    assert callable(kittensynth.KittenVoice.measure_prepared)
+     assert callable(kittensynth.KittenVoice.from_pretrained)
+     assert callable(kittensynth.KittenVoice.from_local)
+     assert callable(kittensynth.KittenVoice.close)
+@@ -40,6 +44,9 @@ def test_request_api_contract_is_truthful_and_public():
+         "supports_word_timings": False,
+         "supports_voice_level": False,
+         "caller_owns_text_boundaries": True,
++        "supports_request_measurement": True,
++        "measurement_entrypoint": "KittenVoice.measure_prepared",
++        "measurement_metric": "model_tokens",
+     }
+
+     assert kittensynth.REQUEST_API_VERSION == 1
+@@ -52,3 +59,22 @@ def test_request_api_contract_is_truthful_and_public():
+         pass
+     else:
+         raise AssertionError("request API contract must be immutable")
++
++
++def test_measurement_public_api_import_does_not_load_onnx_runtime():
++    script = """
++import sys
++import kittensynth
++assert kittensynth.SynthesisMeasure
++assert callable(kittensynth.KittenVoice.measure_prepared)
++assert kittensynth.request_api_contract()["measurement_metric"] == "model_tokens"
++assert "onnxvoice" not in sys.modules
++assert "onnxruntime" not in sys.modules
++"""
++    result = subprocess.run(
++        [sys.executable, "-c", script],
++        capture_output=True,
++        text=True,
++        check=False,
++    )
++    assert result.returncode == 0, result.stderr
+diff --git a/tests/test_types.py b/tests/test_types.py
+index 7324d73..1720b06 100644
+--- a/tests/test_types.py
++++ b/tests/test_types.py
+@@ -1,8 +1,9 @@
+ import wave
+
+ import numpy as np
++import pytest
+
+-from kittensynth.types import SynthesisResult
++from kittensynth.types import SynthesisMeasure, SynthesisResult
+
+
+ def test_wav_output(tmp_path):
+@@ -19,3 +20,71 @@ def test_wav_output(tmp_path):
+         assert handle.getnchannels() == 1
+         assert handle.getframerate() == 24000
+         assert handle.getnframes() == 3
++
++
++@pytest.mark.parametrize(
++    "kwargs",
++    [
++        {"token_count": True, "max_tokens": None, "fits": None},
++        {"token_count": -1, "max_tokens": None, "fits": None},
++        {"token_count": None, "max_tokens": None, "fits": None},
++        {"token_count": 1.5, "max_tokens": None, "fits": None},
++        {"token_count": 1, "max_tokens": True, "fits": True},
++        {"token_count": 1, "max_tokens": 0, "fits": True},
++        {"token_count": 1, "max_tokens": -1, "fits": False},
++        {"token_count": 1, "max_tokens": 1.5, "fits": True},
++        {"token_count": 1, "max_tokens": 2, "fits": 1},
++        {"token_count": 2, "max_tokens": 1, "fits": True},
++        {"token_count": 1, "max_tokens": None, "fits": False},
++        {"token_count": 1, "max_tokens": 2, "fits": None},
++    ],
++)
++def test_synthesis_measure_rejects_invalid_fields(kwargs):
++    with pytest.raises(ValueError):
++        SynthesisMeasure(**kwargs)
++
++
++def test_synthesis_measure_freezes_fields_and_copies_metadata():
++    metadata = {"frontend": "kitteng2p", "token_count": 3, "exact": True}
++    measure = SynthesisMeasure(token_count=3, max_tokens=None, fits=None, metadata=metadata)
++
++    metadata["extra"] = "not copied"
++    assert dict(measure.metadata) == {
++        "frontend": "kitteng2p",
++        "token_count": 3,
++        "exact": True,
++    }
++    with pytest.raises(TypeError):
++        measure.metadata["changed"] = True
++    with pytest.raises(AttributeError):
++        measure.token_count = 4
++
++
++def test_synthesis_measure_rejects_invalid_metadata_and_model_id():
++    for metadata in (
++        {1: "invalid key"},
++        {"nested": {"not": "scalar"}},
++        {"infinite": float("inf")},
++        {"nan": float("nan")},
++        [],
++    ):
++        with pytest.raises(ValueError):
++            SynthesisMeasure(token_count=0, max_tokens=None, fits=None, metadata=metadata)
++
++    with pytest.raises(ValueError, match="model_id"):
++        SynthesisMeasure(
++            token_count=0,
++            max_tokens=None,
++            fits=None,
++            model_id=1,  # type: ignore[arg-type]
++        )
++
++
++@pytest.mark.parametrize(("token_count", "expected_fits"), [(2, True), (3, False)])
++def test_synthesis_measure_reports_known_maximum_fit(token_count, expected_fits):
++    measure = SynthesisMeasure(
++        token_count=token_count,
++        max_tokens=2,
++        fits=expected_fits,
++    )
++    assert measure.fits is expected_fits
+diff --git a/tests/test_voice.py b/tests/test_voice.py
+index 8145c6c..cdd42fa 100644
+--- a/tests/test_voice.py
++++ b/tests/test_voice.py
+@@ -5,7 +5,13 @@ import numpy as np
+ import pytest
+ from kitteng2p.types import PhonemizeResult
+
+-from kittensynth import KittenVoice, ModelInferenceError, SynthesisConfig, VoiceLevelConfig
++from kittensynth import (
++    EmptyTextError,
++    KittenVoice,
++    ModelInferenceError,
++    SynthesisConfig,
++    VoiceLevelConfig,
++)
+ from kittensynth.voice_level import (
+     VoiceCalibrationCatalog,
+     VoiceCalibrationKey,
+@@ -49,6 +55,18 @@ class FakeG2P:
+         self.closed = True
+
+
++class InputSensitiveFakeG2P(FakeG2P):
++    def phonemize_prepared(self, text):
++        token_ids = tuple(range(len(text.split()) + 1))
++        return PhonemizeResult(
++            text=text,
++            raw_phonemes="input-sensitive",
++            phonemes="input-sensitive",
++            token_ids=token_ids,
++            language="en-us",
++        )
++
++
+ def make_voices(path: Path):
+     np.savez(
+         path,
+@@ -105,6 +123,70 @@ def test_synthesis_consumes_kitteng2p_ids_only(tmp_path):
+     assert g2p.closed is False  # injected g2p is caller-owned
+
+
++def test_measure_prepared_returns_exact_token_count_without_inference(tmp_path):
++    model, runtime = make_model(tmp_path)
++
++    measure = model.measure_prepared("hello")
++
++    assert measure.token_count == 5
++    assert measure.max_tokens is None
++    assert measure.fits is None
++    assert runtime.calls == []
++    model.close()
++
++
++def test_measurement_and_synthesis_share_input_sensitive_frontend(tmp_path):
++    voices_path = tmp_path / "voices.npz"
++    make_voices(voices_path)
++    runtime = FakeRuntime()
++    model = KittenVoice(
++        runtime=runtime,
++        voices_path=voices_path,
++        metadata={"voice_aliases": {"Jasper": "expr-voice-2-m"}},
++        model_ref=None,
++        g2p=InputSensitiveFakeG2P(),
++    )
++    text = "hello there"
++
++    measure = model.measure_prepared(text)
++    assert measure.token_count == 3
++    assert measure.token_count != len(text)
++    model.synthesize_prepared(text)
++    assert measure.token_count == len(runtime.calls[-1][0])
++    model.close()
++
++
++def test_measurement_succeeds_when_inference_would_fail(tmp_path):
++    model, runtime = make_model(tmp_path)
++
++    def fail_infer(*args, **kwargs):
++        raise AssertionError("measurement must not call inference")
++
++    runtime.infer = fail_infer
++    assert model.measure_prepared("hello").token_count == 5
++    model.close()
++
++
++@pytest.mark.parametrize("text", ["", "   "])
++def test_measurement_and_synthesis_reject_empty_text_consistently(tmp_path, text):
++    model, runtime = make_model(tmp_path)
++
++    with pytest.raises(EmptyTextError, match="speakable content"):
++        model.measure_prepared(text)
++    with pytest.raises(EmptyTextError, match="speakable content"):
++        model.synthesize_prepared(text)
++    assert runtime.calls == []
++    model.close()
++
++
++def test_measurement_rejects_closed_voice(tmp_path):
++    model, _ = make_model(tmp_path)
++    model.close()
++
++    with pytest.raises(RuntimeError, match="closed"):
++        model.measure_prepared("hello")
++
++
+ def test_runtime_graph_failure_uses_model_inference_error(tmp_path):
+     model, runtime = make_model(tmp_path)

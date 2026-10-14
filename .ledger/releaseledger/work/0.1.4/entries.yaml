@@ -1,0 +1,32 @@
+schema: releaseledger.entry-batch.v1
+operation: create
+schema_version: 1
+object_type: release_entry_batch
+release_version: 0.1.4
+git_base_ref: 4af74210a338f0aae86c67d5d622589e23f0aa5c
+git_base_sha: 4af74210a338f0aae86c67d5d622589e23f0aa5c
+git_head_ref: bb5331d267b3e9027a2ab6c272e4b23607016e0c
+git_head_sha: bb5331d267b3e9027a2ab6c272e4b23607016e0c
+include_merges: nontrivial
+entries:
+  - kind: added
+    summary: Added exact prepared-input token measurement without acoustic inference
+    status: accepted
+    source_refs:
+      - git:bb5331d267b3e9027a2ab6c272e4b23607016e0c
+    paths:
+      - README.md
+      - docs/architecture.md
+      - kittensynth/__init__.py
+      - kittensynth/api_contract.py
+      - kittensynth/types.py
+      - kittensynth/voice.py
+      - tests/test_public_api.py
+      - tests/test_types.py
+      - tests/test_voice.py
+    sources:
+      - git:bb5331d267b3e9027a2ab6c272e4b23607016e0c
+    prs: []
+    issues: []
+    contributors:
+      - "@holgern"

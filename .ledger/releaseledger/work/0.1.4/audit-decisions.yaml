@@ -1,0 +1,21 @@
+rows:
+  - sha: bb5331d267b3e9027a2ab6c272e4b23607016e0c
+    inspected: true
+    inspected_paths:
+      - README.md
+      - docs/architecture.md
+      - kittensynth/__init__.py
+      - kittensynth/api_contract.py
+      - kittensynth/types.py
+      - kittensynth/voice.py
+      - tests/test_public_api.py
+      - tests/test_types.py
+      - tests/test_voice.py
+    observed_behavior: >-
+      Added a public KittenVoice.measure_prepared API that runs the prepared-text KittenG2P frontend, returns the exact model token count with explicit unknown-capacity metadata, and avoids acoustic ONNX inference; exposed SynthesisMeasure and measurement fields through the package and request API, with documentation and tests covering validation and behavior.
+    public_impact: public
+    decision: accepted
+    target_entry_key: null
+    target_entry_id: null
+    notes: ""
+    stale: false
