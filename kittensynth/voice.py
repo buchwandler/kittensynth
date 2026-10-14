@@ -15,7 +15,7 @@ from ._onnxvoice import (
 )
 from .config import SynthesisConfig
 from .errors import EmptyTextError, KittenSynthError, ModelInferenceError
-from .types import SynthesisResult, VoiceInfo
+from .types import SynthesisMeasure, SynthesisResult, VoiceInfo
 from .voice_bank import VoiceBank
 from .voice_level import (
     VoiceCalibrationKey,
@@ -154,6 +154,23 @@ class KittenVoice:
         """Return the calibration decision made for the most recent synthesis."""
         return self._last_voice_level_application
 
+    def _prepare_text(self, text: str) -> Any:
+        if self._closed:
+            raise RuntimeError("KittenVoice is closed")
+        if not isinstance(text, str) or not text.strip():
+            raise EmptyTextError("text must contain speakable content")
+        return self.g2p.phonemize_prepared(text)
+
+    def measure_prepared(self, text: str) -> SynthesisMeasure:
+        """Measure exact Kitten model tokens without acoustic inference."""
+        frontend = self._prepare_text(text)
+        return SynthesisMeasure(
+            token_count=len(frontend.token_ids),
+            max_tokens=None,
+            fits=None,
+            model_id=self.model_id,
+        )
+
     def synthesize_prepared(
         self,
         text: str,
@@ -162,14 +179,10 @@ class KittenVoice:
         speed: float = 1.0,
         config: SynthesisConfig | None = None,
     ) -> SynthesisResult:
-        if self._closed:
-            raise RuntimeError("KittenVoice is closed")
-        if not isinstance(text, str) or not text.strip():
-            raise EmptyTextError("text must contain speakable content")
+        frontend = self._prepare_text(text)
         synthesis_config = (
             config.validated() if config is not None else SynthesisConfig(speed=speed).validated()
         )
-        frontend = self.g2p.phonemize_prepared(text)
         style = self.voice_bank.style_for(voice, text_length=len(text))
         effective_speed = self.voice_bank.effective_speed(voice, synthesis_config.speed)
 

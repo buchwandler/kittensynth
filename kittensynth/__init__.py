@@ -19,7 +19,7 @@ from .errors import (
     UnsupportedModelError,
 )
 from .identity import runtime_identity
-from .types import SynthesisResult, VoiceInfo
+from .types import SynthesisMeasure, SynthesisResult, VoiceInfo
 from .voice import KittenVoice
 from .voice_bank import DEFAULT_VOICE_ALIASES, VoiceBank
 from .voice_level import (
@@ -58,6 +58,7 @@ __all__ = [
     "OnnxVoiceContractError",
     "UnsupportedModelError",
     "SynthesisConfig",
+    "SynthesisMeasure",
     "SynthesisResult",
     "VoiceBank",
     "VoiceInfo",

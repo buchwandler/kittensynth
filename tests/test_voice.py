@@ -5,7 +5,13 @@ import numpy as np
 import pytest
 from kitteng2p.types import PhonemizeResult
 
-from kittensynth import KittenVoice, ModelInferenceError, SynthesisConfig, VoiceLevelConfig
+from kittensynth import (
+    EmptyTextError,
+    KittenVoice,
+    ModelInferenceError,
+    SynthesisConfig,
+    VoiceLevelConfig,
+)
 from kittensynth.voice_level import (
     VoiceCalibrationCatalog,
     VoiceCalibrationKey,
@@ -47,6 +53,18 @@ class FakeG2P:
 
     def close(self):
         self.closed = True
+
+
+class InputSensitiveFakeG2P(FakeG2P):
+    def phonemize_prepared(self, text):
+        token_ids = tuple(range(len(text.split()) + 1))
+        return PhonemizeResult(
+            text=text,
+            raw_phonemes="input-sensitive",
+            phonemes="input-sensitive",
+            token_ids=token_ids,
+            language="en-us",
+        )
 
 
 def make_voices(path: Path):
@@ -103,6 +121,70 @@ def test_synthesis_consumes_kitteng2p_ids_only(tmp_path):
     model.close()
     assert runtime.closed
     assert g2p.closed is False  # injected g2p is caller-owned
+
+
+def test_measure_prepared_returns_exact_token_count_without_inference(tmp_path):
+    model, runtime = make_model(tmp_path)
+
+    measure = model.measure_prepared("hello")
+
+    assert measure.token_count == 5
+    assert measure.max_tokens is None
+    assert measure.fits is None
+    assert runtime.calls == []
+    model.close()
+
+
+def test_measurement_and_synthesis_share_input_sensitive_frontend(tmp_path):
+    voices_path = tmp_path / "voices.npz"
+    make_voices(voices_path)
+    runtime = FakeRuntime()
+    model = KittenVoice(
+        runtime=runtime,
+        voices_path=voices_path,
+        metadata={"voice_aliases": {"Jasper": "expr-voice-2-m"}},
+        model_ref=None,
+        g2p=InputSensitiveFakeG2P(),
+    )
+    text = "hello there"
+
+    measure = model.measure_prepared(text)
+    assert measure.token_count == 3
+    assert measure.token_count != len(text)
+    model.synthesize_prepared(text)
+    assert measure.token_count == len(runtime.calls[-1][0])
+    model.close()
+
+
+def test_measurement_succeeds_when_inference_would_fail(tmp_path):
+    model, runtime = make_model(tmp_path)
+
+    def fail_infer(*args, **kwargs):
+        raise AssertionError("measurement must not call inference")
+
+    runtime.infer = fail_infer
+    assert model.measure_prepared("hello").token_count == 5
+    model.close()
+
+
+@pytest.mark.parametrize("text", ["", "   "])
+def test_measurement_and_synthesis_reject_empty_text_consistently(tmp_path, text):
+    model, runtime = make_model(tmp_path)
+
+    with pytest.raises(EmptyTextError, match="speakable content"):
+        model.measure_prepared(text)
+    with pytest.raises(EmptyTextError, match="speakable content"):
+        model.synthesize_prepared(text)
+    assert runtime.calls == []
+    model.close()
+
+
+def test_measurement_rejects_closed_voice(tmp_path):
+    model, _ = make_model(tmp_path)
+    model.close()
+
+    with pytest.raises(RuntimeError, match="closed"):
+        model.measure_prepared("hello")
 
 
 def test_runtime_graph_failure_uses_model_inference_error(tmp_path):

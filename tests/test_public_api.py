@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from typing import Any, cast
 
 import kittensynth
@@ -8,6 +10,7 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
         "KittenVoice",
         "SynthesisConfig",
         "SynthesisResult",
+        "SynthesisMeasure",
         "discover_models",
         "runtime_identity",
     )
@@ -23,6 +26,7 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
     assert all(hasattr(kittensynth, name) for name in (*required, *required_errors))
     assert all(name in kittensynth.__all__ for name in (*required, *required_errors))
     assert callable(kittensynth.KittenVoice.synthesize_prepared)
+    assert callable(kittensynth.KittenVoice.measure_prepared)
     assert callable(kittensynth.KittenVoice.from_pretrained)
     assert callable(kittensynth.KittenVoice.from_local)
     assert callable(kittensynth.KittenVoice.close)
@@ -40,6 +44,9 @@ def test_request_api_contract_is_truthful_and_public():
         "supports_word_timings": False,
         "supports_voice_level": False,
         "caller_owns_text_boundaries": True,
+        "supports_request_measurement": True,
+        "measurement_entrypoint": "KittenVoice.measure_prepared",
+        "measurement_metric": "model_tokens",
     }
 
     assert kittensynth.REQUEST_API_VERSION == 1
@@ -52,3 +59,22 @@ def test_request_api_contract_is_truthful_and_public():
         pass
     else:
         raise AssertionError("request API contract must be immutable")
+
+
+def test_measurement_public_api_import_does_not_load_onnx_runtime():
+    script = """
+import sys
+import kittensynth
+assert kittensynth.SynthesisMeasure
+assert callable(kittensynth.KittenVoice.measure_prepared)
+assert kittensynth.request_api_contract()["measurement_metric"] == "model_tokens"
+assert "onnxvoice" not in sys.modules
+assert "onnxruntime" not in sys.modules
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr

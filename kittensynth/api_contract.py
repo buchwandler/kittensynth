@@ -17,6 +17,9 @@ _REQUEST_API_CONTRACT: Mapping[str, str | bool] = MappingProxyType(
         "supports_word_timings": False,
         "supports_voice_level": False,
         "caller_owns_text_boundaries": True,
+        "supports_request_measurement": True,
+        "measurement_entrypoint": "KittenVoice.measure_prepared",
+        "measurement_metric": "model_tokens",
     }
 )
 

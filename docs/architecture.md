@@ -18,6 +18,20 @@
 | BS.1770 calibration measurement tooling     | `benchmarks` / `audiosig`        |
 | final program loudness / mastering          | caller                           |
 
+## Exact request measurement
+
+Prepared-text measurement belongs to KittenSynth at the model-input boundary. It uses the same KittenG2P transformation as synthesis and stops before acoustic inference:
+
+```text
+prepared text
+  -> KittenG2P
+  -> token_ids
+  -> measurement boundary (exact model_tokens count)
+  -> ONNX inference
+```
+
+`KittenVoice.measure_prepared(text)` returns `len(frontend.token_ids)` and never invokes ONNX inference. The current model catalog declares no authoritative hard token maximum, so the result uses `max_tokens=None` and `fits=None`. Unknown capacity is not infinite capacity; KittenSynth does not guess a maximum, split the request, or retry inference.
+
 ## Static voice-level correction
 
 Runtime calibration is an opt-in static gain lookup keyed by the exact managed model ID and Kitten internal voice/style ID. It never infers a managed identity for local models, measures loudness during synthesis, or performs dynamic normalization. The audio path is:

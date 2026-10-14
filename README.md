@@ -115,7 +115,21 @@ print(runtime_identity())
 
 A catalog default voice takes precedence; otherwise KittenSynth selects `Jasper` when listed, then the first public alias. Catalog-provided voice metadata is preserved. When a catalog provides only `metadata.voice_aliases`, voices are described with unknown gender and English language defaults; gender is never guessed from an alias.
 
-`runtime_identity()` returns deterministic engine, KittenSynth, kitteng2p, OnnxVoice, and request-API versions. It contains no paths or machine-local state. `request_api_contract()` declares `KittenVoice.synthesize_prepared` as the current entrypoint: prepared-text boundaries remain caller-owned, and linguistic tokens, pronunciation overrides, whole-request phonemes, speakers, word timings, and request-level voice controls are not supported. The package exports typed errors such as `EmptyTextError`, `InvalidVoiceError`, `OnnxVoiceContractError`, `CatalogUnavailableError`, and `ModelInferenceError`; no Readio dependency is required.
+`runtime_identity()` returns deterministic engine, KittenSynth, kitteng2p, OnnxVoice, and request-API versions. It contains no paths or machine-local state. `request_api_contract()` declares `KittenVoice.synthesize_prepared` as the synthesis entrypoint and advertises `KittenVoice.measure_prepared` for exact `model_tokens` request measurement; prepared-text boundaries remain caller-owned, and linguistic tokens, pronunciation overrides, whole-request phonemes, speakers, word timings, and request-level voice controls are not supported. The package exports typed errors such as `EmptyTextError`, `InvalidVoiceError`, `OnnxVoiceContractError`, `CatalogUnavailableError`, and `ModelInferenceError`; no Readio dependency is required.
+
+## Measure prepared input without inference
+
+`KittenVoice.measure_prepared(text)` runs the same KittenG2P prepared-text frontend used by synthesis and returns the exact number of model token IDs without running acoustic ONNX inference:
+
+```python
+from kittensynth import KittenVoice
+
+with KittenVoice.from_pretrained("nano-0.8-int8") as model:
+    measure = model.measure_prepared("Prepared speakable text.")
+    print(measure.token_count, measure.max_tokens, measure.fits)
+```
+
+`max_tokens=None` means KittenSynth has no declared hard maximum for the active model; it does not mean the model has infinite capacity. The request API reports the exact amount in `model_tokens`, with `fits=None` while the maximum is unknown. KittenSynth does not split or retry requests during measurement.
 
 ## Local model
 
