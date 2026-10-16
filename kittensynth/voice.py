@@ -13,8 +13,14 @@ from ._onnxvoice import (
     open_installed_model,
     open_local_model,
 )
+from .capacity import capacity_for_model
 from .config import SynthesisConfig
-from .errors import EmptyTextError, KittenSynthError, ModelInferenceError
+from .errors import (
+    EmptyTextError,
+    KittenSynthError,
+    ModelInferenceError,
+    SynthesisInputTooLongError,
+)
 from .types import SynthesisMeasure, SynthesisResult, VoiceInfo
 from .voice_bank import VoiceBank
 from .voice_level import (
@@ -40,6 +46,10 @@ class KittenVoice:
         self.model_ref = model_ref
         self.model_id = model_id
         self.metadata = dict(metadata)
+        self._capacity = capacity_for_model(
+            self.model_id,
+            self.metadata.get("source_revision"),
+        )
         self.sample_rate = int(sample_rate)
         self._owns_g2p = g2p is None
         self.g2p = g2p or KittenG2P()
@@ -164,11 +174,13 @@ class KittenVoice:
     def measure_prepared(self, text: str) -> SynthesisMeasure:
         """Measure exact Kitten model tokens without acoustic inference."""
         frontend = self._prepare_text(text)
+        token_count = len(frontend.token_ids)
         return SynthesisMeasure(
-            token_count=len(frontend.token_ids),
-            max_tokens=None,
-            fits=None,
+            token_count=token_count,
+            max_tokens=self._capacity.max_tokens,
+            fits=token_count <= self._capacity.max_tokens,
             model_id=self.model_id,
+            metadata={"capacity_policy_revision": self._capacity.policy_revision},
         )
 
     def synthesize_prepared(
@@ -180,6 +192,13 @@ class KittenVoice:
         config: SynthesisConfig | None = None,
     ) -> SynthesisResult:
         frontend = self._prepare_text(text)
+        token_count = len(frontend.token_ids)
+        if token_count > self._capacity.max_tokens:
+            raise SynthesisInputTooLongError(
+                amount=token_count,
+                maximum=self._capacity.max_tokens,
+                unit="model_tokens",
+            )
         synthesis_config = (
             config.validated() if config is not None else SynthesisConfig(speed=speed).validated()
         )

@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
+from kitteng2p import KittenG2P
 from kitteng2p.types import PhonemizeResult
 
 from kittensynth import (
@@ -10,8 +12,10 @@ from kittensynth import (
     KittenVoice,
     ModelInferenceError,
     SynthesisConfig,
+    SynthesisInputTooLongError,
     VoiceLevelConfig,
 )
+from kittensynth.capacity import capacity_for_model
 from kittensynth.voice_level import (
     VoiceCalibrationCatalog,
     VoiceCalibrationKey,
@@ -67,6 +71,28 @@ class InputSensitiveFakeG2P(FakeG2P):
         )
 
 
+class TextPhonemeBackend:
+    def phonemize(self, text: str, *, language: str) -> str:
+        return text
+
+    def close(self):
+        pass
+
+
+class FixedTokenFakeG2P:
+    def __init__(self, token_count: int):
+        self.token_ids = (0, *(1 for _ in range(token_count - 3)), 10, 0)
+
+    def phonemize_prepared(self, text: str):
+        return PhonemizeResult(
+            text=text,
+            raw_phonemes="fixed",
+            phonemes="fixed",
+            token_ids=self.token_ids,
+            language="en-us",
+        )
+
+
 def make_voices(path: Path):
     np.savez(
         path,
@@ -74,20 +100,29 @@ def make_voices(path: Path):
     )
 
 
-def make_model(tmp_path: Path, *, model_id: str | None = None):
+def make_model(
+    tmp_path: Path,
+    *,
+    model_id: str | None = None,
+    g2p: Any | None = None,
+    metadata: dict[str, Any] | None = None,
+):
     voices = tmp_path / "voices.npz"
     make_voices(voices)
     runtime = FakeRuntime()
+    model_metadata = {
+        "voice_aliases": {"Jasper": "expr-voice-2-m"},
+        "speed_priors": {"expr-voice-2-m": 0.8},
+    }
+    if metadata is not None:
+        model_metadata.update(metadata)
     model = KittenVoice(
         runtime=runtime,
         voices_path=voices,
-        metadata={
-            "voice_aliases": {"Jasper": "expr-voice-2-m"},
-            "speed_priors": {"expr-voice-2-m": 0.8},
-        },
+        metadata=model_metadata,
         model_ref=f"kitten:{model_id}" if model_id else None,
         model_id=model_id,
-        g2p=FakeG2P(),
+        g2p=g2p if g2p is not None else FakeG2P(),
     )
     return model, runtime
 
@@ -129,8 +164,8 @@ def test_measure_prepared_returns_exact_token_count_without_inference(tmp_path):
     measure = model.measure_prepared("hello")
 
     assert measure.token_count == 5
-    assert measure.max_tokens is None
-    assert measure.fits is None
+    assert measure.max_tokens == 512
+    assert measure.fits is True
     assert runtime.calls == []
     model.close()
 
@@ -319,4 +354,85 @@ def test_runtime_close_failure_still_closes_owned_g2p(tmp_path, monkeypatch):
     assert owned_g2p.closed
     with pytest.raises(RuntimeError, match="KittenVoice is closed"):
         model.synthesize_prepared("hello")
+    model.close()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Hello, world!",
+        "  extra   spaces\tand\nlines  ",
+        "2026 costs $5.00.",
+        "This is a normal sentence.",
+    ],
+)
+def test_measurement_matches_model_input_from_kitteng2p_for_text_forms(tmp_path, text):
+    g2p = KittenG2P(backend=TextPhonemeBackend())
+    model, runtime = make_model(
+        tmp_path,
+        model_id="nano-0.8-int8",
+        g2p=g2p,
+        metadata={"source_revision": "revision-1"},
+    )
+
+    measured = model.measure_prepared(text)
+    assert runtime.calls == []
+
+    model.synthesize_prepared(text)
+    model_input = runtime.calls[-1][0]
+
+    assert measured.token_count == len(model_input)
+    assert measured.max_tokens == 512
+    assert measured.fits is (len(model_input) <= measured.max_tokens)
+    assert model_input[0] == 0
+    assert model_input[-2:] == (10, 0)
+    model.close()
+    g2p.close()
+
+
+@pytest.mark.parametrize(
+    ("token_count", "fits"),
+    [(511, True), (512, True), (513, False)],
+)
+def test_synthesis_enforces_exact_framed_input_boundaries(tmp_path, token_count, fits):
+    g2p = FixedTokenFakeG2P(token_count)
+    model, runtime = make_model(tmp_path, model_id="nano-0.8-int8", g2p=g2p)
+
+    measured = model.measure_prepared("boundary")
+    assert measured.token_count == token_count
+    assert measured.max_tokens == 512
+    assert measured.fits is fits
+
+    if fits:
+        model.synthesize_prepared("boundary")
+        assert runtime.calls[-1][0] == g2p.token_ids
+    else:
+        with pytest.raises(SynthesisInputTooLongError) as caught:
+            model.synthesize_prepared("boundary")
+        assert caught.value.amount == 513
+        assert caught.value.maximum == 512
+        assert caught.value.unit == "model_tokens"
+        assert runtime.calls == []
+    model.close()
+
+
+def test_measurement_policy_revision_is_stable_for_model_and_frontend(tmp_path):
+    model, _ = make_model(
+        tmp_path,
+        model_id="nano-0.8-int8",
+        metadata={"source_revision": "revision-1"},
+    )
+
+    measured = model.measure_prepared("hello")
+    expected = capacity_for_model("nano-0.8-int8", "revision-1")
+
+    assert measured.metadata["capacity_policy_revision"] == expected.policy_revision
+    assert (
+        expected.policy_revision
+        == capacity_for_model("nano-0.8-int8", "revision-1").policy_revision
+    )
+    assert (
+        expected.policy_revision
+        != capacity_for_model("nano-0.8-int8", "revision-2").policy_revision
+    )
     model.close()

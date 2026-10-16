@@ -14,6 +14,7 @@ from types import MappingProxyType
 from typing import Any
 
 from ._onnxvoice import _manager
+from .capacity import capacity_for_model
 from .errors import CatalogDiscoveryError, CatalogUnavailableError, KittenSynthError
 
 
@@ -46,6 +47,7 @@ class DiscoveredModel:
     voices: tuple[DescribedVoice, ...]
     default_voice: str | None
     source_revision: str | None
+    max_tokens: int | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
     runtime_available: bool = True
 
@@ -143,6 +145,10 @@ def _model_from_item(item: Any, records: tuple[Any, ...]) -> DiscoveredModel:
     if revision is not None:
         metadata["source_revision"] = revision
 
+    capacity = capacity_for_model(item_id, revision)
+    metadata["max_tokens"] = capacity.max_tokens
+    metadata["capacity_policy_revision"] = capacity.policy_revision
+
     version = metadata.get("version")
     language = metadata.get("language")
     quality = metadata.get("quality")
@@ -168,6 +174,7 @@ def _model_from_item(item: Any, records: tuple[Any, ...]) -> DiscoveredModel:
         voices=voices,
         default_voice=default_voice,
         source_revision=revision,
+        max_tokens=capacity.max_tokens,
         metadata=metadata,
     )
 

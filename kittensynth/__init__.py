@@ -16,6 +16,7 @@ from .errors import (
     KittenSynthError,
     ModelInferenceError,
     OnnxVoiceContractError,
+    SynthesisInputTooLongError,
     UnsupportedModelError,
 )
 from .identity import runtime_identity
@@ -54,6 +55,7 @@ __all__ = [
     "InvalidVoiceError",
     "KittenSynthError",
     "ModelInferenceError",
+    "SynthesisInputTooLongError",
     "KittenVoice",
     "OnnxVoiceContractError",
     "UnsupportedModelError",

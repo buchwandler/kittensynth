@@ -35,3 +35,9 @@ KittenSynth lists the Kitten catalog with `OnnxVoice.list("kitten", language=...
 Public `DiscoveredModel` records retain catalog ID/name/version/language/quality/sample rate/aliases, catalog metadata, and a stable `source_revision` both as a field and in metadata. Public voices are user-facing aliases from catalog voice records or `metadata.voice_aliases`. Explicit voice metadata is used as supplied; when aliases are the only voice information, demographics remain unknown and English (`en`) is used as the language/locale default. Default selection is explicit catalog default, then `Jasper`, then the first public alias, else `None`.
 
 Global `runtime_identity()` describes installed software versions and request API version only. Catalog/model revision data remains associated with each discovered model so global identity does not change with the selected catalog item.
+
+## Kitten 0.8 model-input capacity
+
+The supported Kitten 0.8 ONNX artifacts have a 512-row positional-embedding table. This is the hard maximum for the complete `input_ids` sequence sent to OnnxVoice. KittenG2P frames IDs as `(0, *ids, 10, 0)`, and those three frame IDs count toward the maximum.
+
+Kittensynth's centralized capacity policy supplies `DiscoveredModel.max_tokens`, `measure_prepared().max_tokens`, synthesis preflight, and the public `SynthesisInputTooLongError`. Discovery metadata and measurements carry the same `capacity_policy_revision`, derived from the capacity policy, frame IDs, model revision, and installed frontend/runtime versions. Measurement uses the exact framed IDs passed to inference and does not initialize acoustic inference. Over-limit synthesis fails before the runtime call without truncation or splitting.

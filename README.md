@@ -129,7 +129,9 @@ with KittenVoice.from_pretrained("nano-0.8-int8") as model:
     print(measure.token_count, measure.max_tokens, measure.fits)
 ```
 
-`max_tokens=None` means KittenSynth has no declared hard maximum for the active model; it does not mean the model has infinite capacity. The request API reports the exact amount in `model_tokens`, with `fits=None` while the maximum is unknown. KittenSynth does not split or retry requests during measurement.
+For supported Kitten 0.8 models, `max_tokens` is the hard limit of 512 total model-input IDs, derived from the model's 512-position embedding table. The count includes KittenG2P's framed sequence `(0, *ids, 10, 0)`, and `fits` is always `token_count <= max_tokens`.
+
+The `capacity_policy_revision` metadata identifies the model, frontend, and capacity policy used for the measurement. Measurement does not run acoustic inference. Synthesis rejects over-limit input with `SynthesisInputTooLongError` and never truncates or splits text.
 
 ## Local model
 

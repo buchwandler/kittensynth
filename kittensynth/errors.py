@@ -36,3 +36,15 @@ class CatalogUnavailableError(CatalogDiscoveryError):
 
 class ModelInferenceError(KittenSynthError, RuntimeError):
     """Raised when the Kitten runtime fails while generating audio."""
+
+
+class SynthesisInputTooLongError(KittenSynthError, ValueError):
+    """Raised when framed model input exceeds the Kitten context limit."""
+
+    def __init__(self, amount: int, maximum: int, unit: str = "model_tokens") -> None:
+        self.amount = amount
+        self.maximum = maximum
+        self.unit = unit
+        self.token_count = amount
+        self.max_tokens = maximum
+        super().__init__(f"Kitten input has {amount} {unit}; maximum is {maximum}")

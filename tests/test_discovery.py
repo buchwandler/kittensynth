@@ -5,6 +5,7 @@ import pytest
 
 import kittensynth
 from kittensynth import discovery
+from kittensynth.capacity import capacity_for_model
 
 
 class FakeManager:
@@ -118,6 +119,18 @@ def test_discover_models_maps_catalog_items_and_voice_metadata(monkeypatch):
     assert model.default_voice == "Jasper"
     assert model.source_revision == "abc123"
     assert model.metadata["source_revision"] == "abc123"
+    capacity = capacity_for_model(model.id, model.source_revision)
+    assert model.max_tokens == capacity.max_tokens
+    assert model.metadata["max_tokens"] == model.max_tokens
+    assert model.metadata["capacity_policy_revision"] == capacity.policy_revision
+    assert (
+        capacity.policy_revision
+        == capacity_for_model(model.id, model.source_revision).policy_revision
+    )
+    assert (
+        capacity.policy_revision
+        != capacity_for_model(model.id, "different-revision").policy_revision
+    )
     assert model.runtime_available is True
     assert model.voice_ids == ("Jasper", "Aria")
     assert model.voices[0].gender == "male"

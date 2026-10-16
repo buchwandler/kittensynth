@@ -12,6 +12,7 @@ def test_public_errors_are_typed_and_discovery_runtime_errors_are_distinct():
         "CatalogDiscoveryError",
         "CatalogUnavailableError",
         "ModelInferenceError",
+        "SynthesisInputTooLongError",
     )
     for name in required:
         error_type = getattr(kittensynth, name)
@@ -22,3 +23,13 @@ def test_public_errors_are_typed_and_discovery_runtime_errors_are_distinct():
     assert issubclass(kittensynth.CatalogUnavailableError, kittensynth.CatalogDiscoveryError)
     assert not issubclass(kittensynth.ModelInferenceError, ValueError)
     assert not issubclass(kittensynth.CatalogUnavailableError, ValueError)
+
+
+def test_public_overflow_error_exposes_capacity_fields():
+    error = kittensynth.SynthesisInputTooLongError(513, 512)
+
+    assert error.amount == 513
+    assert error.maximum == 512
+    assert error.unit == "model_tokens"
+    assert error.token_count == 513
+    assert error.max_tokens == 512

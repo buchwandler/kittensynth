@@ -21,6 +21,7 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
         "InvalidVoiceError",
         "UnsupportedModelError",
         "OnnxVoiceContractError",
+        "SynthesisInputTooLongError",
     )
 
     assert all(hasattr(kittensynth, name) for name in (*required, *required_errors))
