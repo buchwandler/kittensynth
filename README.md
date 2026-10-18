@@ -4,20 +4,22 @@ KittenTTS synthesis layer built on **kitteng2p + OnnxVoice**.
 
 ## Installation
 
-A base `pip install kittensynth` is provider-neutral and does not install ONNX Runtime. For CPU inference, install the CPU provider extra:
+The base `pip install kittensynth` provides the frontend, discovery, and local-model plumbing. It does not install an ONNX Runtime provider or the optional Hugging Face download transport.
+
+- `kittensynth[cpu]`: CPU ONNX Runtime plus managed Hugging Face downloads.
+- `kittensynth[gpu]`: GPU ONNX Runtime plus managed Hugging Face downloads.
+- `kittensynth[huggingface]`: managed Hub transport without selecting a runtime provider.
+- `kittensynth[bundled-g2p]`: bundled G2P runtime.
+
+Install the CPU provider, or GPU / bundled G2P support, with:
 
 ```bash
 python -m pip install "kittensynth[cpu]"
-```
-
-For GPU inference or the bundled G2P runtime, use:
-
-```bash
 python -m pip install "kittensynth[gpu]"
 python -m pip install "kittensynth[cpu,bundled-g2p]"
 ```
 
-Managed examples require an ONNX Runtime provider and a working G2P runtime. The CPU plus bundled G2P command above is the copy/paste setup for the examples.
+Managed `KittenVoice.from_pretrained()` downloads require network access on a cold cache, an ONNX Runtime provider, and a working G2P runtime. The CPU plus bundled G2P command above is the copy/paste setup for the examples.
 
 ## Documentation
 
@@ -67,7 +69,7 @@ float32 waveform
 
 ## Required OnnxVoice contract
 
-KittenSynth requires OnnxVoice 0.2.x. OnnxVoice 0.2.0 and later in that supported range register the built-in Kitten adapter and expose:
+KittenSynth requires OnnxVoice `>=0.2.10,<0.3`. This range registers the built-in Kitten adapter and exposes:
 
 ```text
 system = kitten

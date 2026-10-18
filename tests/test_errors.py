@@ -11,6 +11,7 @@ def test_public_errors_are_typed_and_discovery_runtime_errors_are_distinct():
         "OnnxVoiceContractError",
         "CatalogDiscoveryError",
         "CatalogUnavailableError",
+        "ManagedModelDependencyError",
         "ModelInferenceError",
         "SynthesisInputTooLongError",
     )

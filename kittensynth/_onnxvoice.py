@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .errors import OnnxVoiceContractError, UnsupportedModelError
+from .errors import ManagedModelDependencyError, OnnxVoiceContractError, UnsupportedModelError
 from .voice_bank import DEFAULT_VOICE_ALIASES
 
 DEFAULT_CATALOG_URL = (
@@ -101,13 +101,27 @@ def install_pretrained_model(
     progress: Any | None = None,
 ) -> ResolvedKittenModel:
     manager = _manager(cache_dir=cache_dir, offline=offline, catalog_url=catalog_url)
-    installation = manager.install(
-        normalize_ref(ref),
-        quality=quality,
-        refresh=refresh_catalog,
-        force=force_download,
-        progress=progress,
-    )
+    try:
+        installation = manager.install(
+            normalize_ref(ref),
+            quality=quality,
+            refresh=refresh_catalog,
+            force=force_download,
+            progress=progress,
+        )
+    except Exception as exc:
+        try:
+            from onnxvoice.errors import OptionalDependencyError
+        except ImportError:
+            pass
+        else:
+            if isinstance(exc, OptionalDependencyError):
+                raise ManagedModelDependencyError(
+                    "Managed Kitten model downloads require the Hugging Face transport; "
+                    "install the kittensynth[huggingface], kittensynth[cpu], or "
+                    "kittensynth[gpu] extra."
+                ) from exc
+        raise
     return installation_to_model(installation)
 
 

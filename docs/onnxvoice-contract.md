@@ -1,5 +1,16 @@
 # OnnxVoice Kitten contract required by kittensynth
 
+## Dependency and install contract
+
+KittenSynth depends on OnnxVoice `>=0.2.10,<0.3`. The base package remains provider-neutral: it does not install ONNX Runtime. Optional dependencies are exposed as follows:
+
+- `kittensynth[cpu]` installs OnnxVoice's CPU runtime and Hugging Face transport.
+- `kittensynth[gpu]` installs OnnxVoice's GPU runtime and Hugging Face transport.
+- `kittensynth[huggingface]` installs the transport without choosing an inference provider.
+- `kittensynth[bundled-g2p]` installs the bundled G2P runtime.
+
+The `from_pretrained()` Kitten catalog uses Hugging Face-backed artifacts, so CPU/GPU extras support managed downloads from a cold cache. Local-model users may keep the base package and select their provider arrangement separately; managed downloads use OnnxVoice's verified store and integrity checks.
+
 Register `system="kitten"`.
 
 The managed installation should provide:

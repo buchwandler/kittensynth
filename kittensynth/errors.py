@@ -22,6 +22,10 @@ class UnsupportedModelError(KittenSynthError, RuntimeError):
     """Raised when an installation does not satisfy the Kitten contract."""
 
 
+class ManagedModelDependencyError(KittenSynthError, RuntimeError):
+    """Raised when managed model installation lacks its optional transport."""
+
+
 class OnnxVoiceContractError(KittenSynthError, RuntimeError):
     """Raised when the installed OnnxVoice lacks Kitten support."""
 

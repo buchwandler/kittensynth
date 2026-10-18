@@ -18,7 +18,7 @@ keywords = ["tts", "kitten", "kittentts", "onnx", "onnxruntime", "speech"]
 dependencies = [
   "numpy>=1.23",
   "kitteng2p>=0.1.1,<0.2",
-  "onnxvoice>=0.2,<0.3",
+  "onnxvoice>=0.2.10,<0.3",
   "audiosig>=0.1.4,<0.2",
 ]
 classifiers = [
@@ -33,8 +33,9 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-cpu = ["onnxvoice[cpu]>=0.2,<0.3"]
-gpu = ["onnxvoice[gpu]>=0.2,<0.3"]
+huggingface = ["onnxvoice[huggingface]>=0.2.10,<0.3"]
+cpu = ["onnxvoice[cpu,huggingface]>=0.2.10,<0.3"]
+gpu = ["onnxvoice[gpu,huggingface]>=0.2.10,<0.3"]
 bundled-g2p = ["kitteng2p[bundled]>=0.1.1,<0.2"]
 docs = [
   "sphinx>=7.0.0",
