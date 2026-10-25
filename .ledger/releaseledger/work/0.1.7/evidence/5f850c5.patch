@@ -1,0 +1,272 @@
+ kittensynth/__init__.py            |   2 +
+ kittensynth/_onnxvoice.py          |  14 ++++-
+ kittensynth/errors.py              |   4 ++
+ tests/test_errors.py               |   3 +
+ tests/test_managed_dependencies.py | 116 ++++++++++++++++++++++++++++++++++++-
+ tests/test_public_api.py           |   3 +
+ 6 files changed, 140 insertions(+), 2 deletions(-)
+
+diff --git a/kittensynth/__init__.py b/kittensynth/__init__.py
+index 3efa5ff..474f151 100644
+--- a/kittensynth/__init__.py
++++ b/kittensynth/__init__.py
+@@ -15,6 +15,7 @@ from .errors import (
+     InvalidVoiceError,
+     KittenSynthError,
+     ManagedModelDependencyError,
++    ModelDownloadError,
+     ModelInferenceError,
+     OnnxVoiceContractError,
+     SynthesisInputTooLongError,
+@@ -56,6 +57,7 @@ __all__ = [
+     "InvalidVoiceError",
+     "KittenSynthError",
+     "ManagedModelDependencyError",
++    "ModelDownloadError",
+     "ModelInferenceError",
+     "SynthesisInputTooLongError",
+     "KittenVoice",
+diff --git a/kittensynth/_onnxvoice.py b/kittensynth/_onnxvoice.py
+index e80a796..6917807 100644
+--- a/kittensynth/_onnxvoice.py
++++ b/kittensynth/_onnxvoice.py
+@@ -7,7 +7,12 @@ from dataclasses import dataclass
+ from pathlib import Path
+ from typing import Any
+
+-from .errors import ManagedModelDependencyError, OnnxVoiceContractError, UnsupportedModelError
++from .errors import (
++    ManagedModelDependencyError,
++    ModelDownloadError,
++    OnnxVoiceContractError,
++    UnsupportedModelError,
++)
+ from .voice_bank import DEFAULT_VOICE_ALIASES
+
+ DEFAULT_CATALOG_URL = (
+@@ -121,6 +126,13 @@ def install_pretrained_model(
+                     "install the kittensynth[huggingface], kittensynth[cpu], or "
+                     "kittensynth[gpu] extra."
+                 ) from exc
++        try:
++            from onnxvoice.errors import AssetDownloadError
++        except ImportError:
++            pass
++        else:
++            if isinstance(exc, AssetDownloadError):
++                raise ModelDownloadError(f"Managed Kitten model download failed: {exc}") from exc
+         raise
+     return installation_to_model(installation)
+
+diff --git a/kittensynth/errors.py b/kittensynth/errors.py
+index baebac2..a185e9a 100644
+--- a/kittensynth/errors.py
++++ b/kittensynth/errors.py
+@@ -26,6 +26,10 @@ class ManagedModelDependencyError(KittenSynthError, RuntimeError):
+     """Raised when managed model installation lacks its optional transport."""
+
+
++class ModelDownloadError(KittenSynthError, RuntimeError):
++    """A managed Kitten model asset could not be downloaded or verified."""
++
++
+ class OnnxVoiceContractError(KittenSynthError, RuntimeError):
+     """Raised when the installed OnnxVoice lacks Kitten support."""
+
+diff --git a/tests/test_errors.py b/tests/test_errors.py
+index 420901c..862419f 100644
+--- a/tests/test_errors.py
++++ b/tests/test_errors.py
+@@ -1,4 +1,5 @@
+ import kittensynth
++from kittensynth import ModelDownloadError
+
+
+ def test_public_errors_are_typed_and_discovery_runtime_errors_are_distinct():
+@@ -13,6 +14,7 @@ def test_public_errors_are_typed_and_discovery_runtime_errors_are_distinct():
+         "CatalogUnavailableError",
+         "ManagedModelDependencyError",
+         "ModelInferenceError",
++        "ModelDownloadError",
+         "SynthesisInputTooLongError",
+     )
+     for name in required:
+@@ -21,6 +23,7 @@ def test_public_errors_are_typed_and_discovery_runtime_errors_are_distinct():
+         assert issubclass(error_type, kittensynth.KittenSynthError)
+         assert name in kittensynth.__all__
+
++    assert kittensynth.ModelDownloadError is ModelDownloadError
+     assert issubclass(kittensynth.CatalogUnavailableError, kittensynth.CatalogDiscoveryError)
+     assert not issubclass(kittensynth.ModelInferenceError, ValueError)
+     assert not issubclass(kittensynth.CatalogUnavailableError, ValueError)
+diff --git a/tests/test_managed_dependencies.py b/tests/test_managed_dependencies.py
+index 90c4fe2..98d5a3e 100644
+--- a/tests/test_managed_dependencies.py
++++ b/tests/test_managed_dependencies.py
+@@ -2,11 +2,17 @@ from __future__ import annotations
+
+ import os
+ from pathlib import Path
++from types import SimpleNamespace
+ from typing import Any
+
+ import pytest
+ from onnxvoice import OnnxVoice
+-from onnxvoice.errors import CatalogError, OptionalDependencyError
++from onnxvoice.errors import (
++    AssetDownloadError,
++    AssetTransportError,
++    CatalogError,
++    OptionalDependencyError,
++)
+
+ import kittensynth
+ from kittensynth import _onnxvoice
+@@ -21,6 +27,39 @@ class _FailingManager:
+         raise self.error
+
+
++class _InstallAndOpenManager:
++    def __init__(self, installation: Any, open_error: Exception | None = None) -> None:
++        self.installation = installation
++        self.open_error = open_error
++
++    def install(self, *_: object, **__: object) -> Any:
++        return self.installation
++
++    def open(self, *_: object, **__: object) -> Any:
++        if self.open_error is not None:
++            raise self.open_error
++        return object()
++
++
++def _make_installation(tmp_path: Path) -> Any:
++    model_path = tmp_path / "model.onnx"
++    voices_path = tmp_path / "voices.npz"
++    model_path.touch()
++    voices_path.touch()
++    artifacts = {
++        "model": SimpleNamespace(path=model_path),
++        "voices": SimpleNamespace(path=voices_path),
++    }
++    return SimpleNamespace(
++        system="kitten",
++        id="micro-0.8",
++        ref="kitten:micro-0.8",
++        sample_rate=24000,
++        metadata={},
++        artifact=lambda role: artifacts[role],
++    )
++
++
+ def test_missing_hub_transport_maps_to_public_typed_error(
+     monkeypatch: pytest.MonkeyPatch,
+ ) -> None:
+@@ -38,6 +77,81 @@ def test_missing_hub_transport_maps_to_public_typed_error(
+     assert kittensynth.ManagedModelDependencyError is ManagedModelDependencyError
+
+
++def test_asset_download_error_maps_to_public_error_without_leaking_low_level_details(
++    monkeypatch: pytest.MonkeyPatch,
++) -> None:
++    low_level = RuntimeError("private-token=do-not-leak")
++    original = AssetDownloadError(
++        "Could not download Hugging Face asset kitten:micro-0.8 (RuntimeError)"
++    )
++    original.__cause__ = low_level
++    manager = _FailingManager(original)
++    monkeypatch.setattr(_onnxvoice, "_manager", lambda **_: manager)
++
++    with pytest.raises(kittensynth.ModelDownloadError) as caught:
++        _onnxvoice.install_pretrained_model("micro-0.8")
++
++    assert caught.value.__cause__ is original
++    assert caught.value.__cause__.__cause__ is low_level
++    assert "Could not download Hugging Face asset kitten:micro-0.8" in str(caught.value)
++    assert "private-token" not in str(caught.value)
++
++
++def test_asset_transport_subclass_maps_and_preserves_transport_diagnostics(
++    monkeypatch: pytest.MonkeyPatch,
++) -> None:
++    original = AssetTransportError(
++        "Could not download Hugging Face asset kitten:micro-0.8 (ValueError); "
++        "HTTP-mode retry was attempted and failed; direct HTTPS fallback was attempted and failed.",
++        repository="example/kitten",
++        revision="main",
++        path="model.onnx",
++        stage="xet_fallback",
++        native_error_type="URLError",
++        fallback_attempted=True,
++        fallback_failed=True,
++    )
++    monkeypatch.setattr(_onnxvoice, "_manager", lambda **_: _FailingManager(original))
++
++    with pytest.raises(kittensynth.ModelDownloadError) as caught:
++        _onnxvoice.install_pretrained_model("micro-0.8")
++
++    assert caught.value.__cause__ is original
++    assert isinstance(caught.value.__cause__, AssetTransportError)
++    assert caught.value.__cause__.stage == "xet_fallback"
++    assert "direct HTTPS fallback was attempted and failed" in str(caught.value)
++
++
++def test_successful_install_resolves_model_and_voice_artifacts(
++    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
++) -> None:
++    installation = _make_installation(tmp_path)
++    manager = _InstallAndOpenManager(installation)
++    monkeypatch.setattr(_onnxvoice, "_manager", lambda **_: manager)
++
++    resolved = _onnxvoice.install_pretrained_model("micro-0.8")
++
++    assert resolved.installation is installation
++    assert resolved.model_id == "micro-0.8"
++    assert resolved.model_path == installation.artifact("model").path
++    assert resolved.voices_path == installation.artifact("voices").path
++
++
++def test_open_failure_after_install_is_not_classified_as_download_error(
++    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
++) -> None:
++    installation = _make_installation(tmp_path)
++    original = RuntimeError("provider initialization failed")
++    manager = _InstallAndOpenManager(installation, open_error=original)
++    monkeypatch.setattr(_onnxvoice, "_manager", lambda **_: manager)
++
++    with pytest.raises(RuntimeError) as caught:
++        kittensynth.KittenVoice.from_pretrained("micro-0.8")
++
++    assert caught.value is original
++    assert not isinstance(caught.value, kittensynth.ModelDownloadError)
++
++
+ def test_catalog_errors_are_not_reclassified_as_missing_transport(
+     monkeypatch: pytest.MonkeyPatch,
+ ) -> None:
+diff --git a/tests/test_public_api.py b/tests/test_public_api.py
+index 66505e5..c11f4c9 100644
+--- a/tests/test_public_api.py
++++ b/tests/test_public_api.py
+@@ -3,6 +3,7 @@ import sys
+ from typing import Any, cast
+
+ import kittensynth
++from kittensynth import ModelDownloadError
+
+
+ def test_readio_expected_public_api_and_typed_errors_are_exported():
+@@ -21,11 +22,13 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
+         "InvalidVoiceError",
+         "UnsupportedModelError",
+         "OnnxVoiceContractError",
++        "ModelDownloadError",
+         "SynthesisInputTooLongError",
+     )
+
+     assert all(hasattr(kittensynth, name) for name in (*required, *required_errors))
+     assert all(name in kittensynth.__all__ for name in (*required, *required_errors))
++    assert kittensynth.ModelDownloadError is ModelDownloadError
+     assert callable(kittensynth.KittenVoice.synthesize_prepared)
+     assert callable(kittensynth.KittenVoice.measure_prepared)
+     assert callable(kittensynth.KittenVoice.from_pretrained)

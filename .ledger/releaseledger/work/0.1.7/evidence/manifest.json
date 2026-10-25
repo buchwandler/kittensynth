@@ -1,0 +1,30 @@
+{
+  "candidate_count": 1,
+  "candidates": [
+    {
+      "additions": 140,
+      "deletions": 2,
+      "patch_file": "5f850c5.patch",
+      "patch_sha256": "6a745713c9dc724923d298f20454ec527d775b42c58c74166157207a8d2929d7",
+      "paths": [
+        "kittensynth/__init__.py",
+        "kittensynth/_onnxvoice.py",
+        "kittensynth/errors.py",
+        "tests/test_errors.py",
+        "tests/test_managed_dependencies.py",
+        "tests/test_public_api.py"
+      ],
+      "sha": "5f850c55cfbd9ed21fc8674332891b8319f2d158",
+      "short_sha": "5f850c5",
+      "source_ref": "git:5f850c55cfbd9ed21fc8674332891b8319f2d158"
+    }
+  ],
+  "git_base_ref": "128da82ea9754bc11a9e086a5e664c941cc39eab",
+  "git_base_sha": "128da82ea9754bc11a9e086a5e664c941cc39eab",
+  "git_head_ref": "5f850c55cfbd9ed21fc8674332891b8319f2d158",
+  "git_head_sha": "5f850c55cfbd9ed21fc8674332891b8319f2d158",
+  "include_merges": "nontrivial",
+  "object_type": "git_evidence_manifest",
+  "release_version": "0.1.7",
+  "schema_version": 1
+}

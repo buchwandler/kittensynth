@@ -1,0 +1,29 @@
+schema: releaseledger.entry-batch.v1
+operation: create
+schema_version: 1
+object_type: release_entry_batch
+release_version: 0.1.7
+git_base_ref: 128da82ea9754bc11a9e086a5e664c941cc39eab
+git_base_sha: 128da82ea9754bc11a9e086a5e664c941cc39eab
+git_head_ref: 5f850c55cfbd9ed21fc8674332891b8319f2d158
+git_head_sha: 5f850c55cfbd9ed21fc8674332891b8319f2d158
+include_merges: nontrivial
+entries:
+  - kind: added
+    summary: "Added public ModelDownloadError reporting for managed model asset download and verification failures"
+    status: accepted
+    source_refs:
+      - git:5f850c55cfbd9ed21fc8674332891b8319f2d158
+    paths:
+      - kittensynth/__init__.py
+      - kittensynth/_onnxvoice.py
+      - kittensynth/errors.py
+      - tests/test_errors.py
+      - tests/test_managed_dependencies.py
+      - tests/test_public_api.py
+    sources:
+      - git:5f850c55cfbd9ed21fc8674332891b8319f2d158
+    prs: []
+    issues: []
+    contributors:
+      - "@holgern"
