@@ -3,6 +3,7 @@ import sys
 from typing import Any, cast
 
 import kittensynth
+from kittensynth import ModelDownloadError
 
 
 def test_readio_expected_public_api_and_typed_errors_are_exported():
@@ -21,11 +22,13 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
         "InvalidVoiceError",
         "UnsupportedModelError",
         "OnnxVoiceContractError",
+        "ModelDownloadError",
         "SynthesisInputTooLongError",
     )
 
     assert all(hasattr(kittensynth, name) for name in (*required, *required_errors))
     assert all(name in kittensynth.__all__ for name in (*required, *required_errors))
+    assert kittensynth.ModelDownloadError is ModelDownloadError
     assert callable(kittensynth.KittenVoice.synthesize_prepared)
     assert callable(kittensynth.KittenVoice.measure_prepared)
     assert callable(kittensynth.KittenVoice.from_pretrained)

@@ -1,4 +1,5 @@
 import kittensynth
+from kittensynth import ModelDownloadError
 
 
 def test_public_errors_are_typed_and_discovery_runtime_errors_are_distinct():
@@ -13,6 +14,7 @@ def test_public_errors_are_typed_and_discovery_runtime_errors_are_distinct():
         "CatalogUnavailableError",
         "ManagedModelDependencyError",
         "ModelInferenceError",
+        "ModelDownloadError",
         "SynthesisInputTooLongError",
     )
     for name in required:
@@ -21,6 +23,7 @@ def test_public_errors_are_typed_and_discovery_runtime_errors_are_distinct():
         assert issubclass(error_type, kittensynth.KittenSynthError)
         assert name in kittensynth.__all__
 
+    assert kittensynth.ModelDownloadError is ModelDownloadError
     assert issubclass(kittensynth.CatalogUnavailableError, kittensynth.CatalogDiscoveryError)
     assert not issubclass(kittensynth.ModelInferenceError, ValueError)
     assert not issubclass(kittensynth.CatalogUnavailableError, ValueError)

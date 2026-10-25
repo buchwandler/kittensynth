@@ -26,6 +26,10 @@ class ManagedModelDependencyError(KittenSynthError, RuntimeError):
     """Raised when managed model installation lacks its optional transport."""
 
 
+class ModelDownloadError(KittenSynthError, RuntimeError):
+    """A managed Kitten model asset could not be downloaded or verified."""
+
+
 class OnnxVoiceContractError(KittenSynthError, RuntimeError):
     """Raised when the installed OnnxVoice lacks Kitten support."""
 

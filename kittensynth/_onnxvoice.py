@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .errors import ManagedModelDependencyError, OnnxVoiceContractError, UnsupportedModelError
+from .errors import (
+    ManagedModelDependencyError,
+    ModelDownloadError,
+    OnnxVoiceContractError,
+    UnsupportedModelError,
+)
 from .voice_bank import DEFAULT_VOICE_ALIASES
 
 DEFAULT_CATALOG_URL = (
@@ -121,6 +126,13 @@ def install_pretrained_model(
                     "install the kittensynth[huggingface], kittensynth[cpu], or "
                     "kittensynth[gpu] extra."
                 ) from exc
+        try:
+            from onnxvoice.errors import AssetDownloadError
+        except ImportError:
+            pass
+        else:
+            if isinstance(exc, AssetDownloadError):
+                raise ModelDownloadError(f"Managed Kitten model download failed: {exc}") from exc
         raise
     return installation_to_model(installation)
 
