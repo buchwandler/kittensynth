@@ -1,0 +1,26 @@
+rows:
+  - sha: cdec81d9853edfbf553664582e2b8e4968cf3f65
+    inspected: true
+    inspected_paths:
+      - README.md
+      - docs/architecture.md
+      - kittensynth/__init__.py
+      - kittensynth/api_contract.py
+      - kittensynth/voice.py
+      - pyproject.toml
+      - tests/test_dependency_boundary.py
+      - tests/test_g2p_requests.py
+      - tests/test_identity.py
+      - tests/test_public_api.py
+    observed_behavior:
+      Added public request-level linguistic-token and pronunciation-override
+      inputs, configured G2Lex lexicon support, pronunciation diagnostics, and matching
+      measurement/synthesis behavior; raised the kitteng2p floor to 0.1.2
+    public_impact: public
+    decision: accepted
+    target_entry_key: null
+    target_entry_id: entry-0001
+    notes:
+      Reviewed implementation, public contract, documentation, dependency metadata,
+      and focused tests
+    stale: false

@@ -1,0 +1,33 @@
+schema: releaseledger.entry-batch.v1
+operation: create
+schema_version: 1
+object_type: release_entry_batch
+release_version: 0.1.8
+git_base_ref: 4a6d56e9ab85dde30bd3b1f080312f26d4c44396
+git_base_sha: 4a6d56e9ab85dde30bd3b1f080312f26d4c44396
+git_head_ref: cdec81d9853edfbf553664582e2b8e4968cf3f65
+git_head_sha: cdec81d9853edfbf553664582e2b8e4968cf3f65
+include_merges: nontrivial
+entries:
+  - kind: added
+    summary: Added linguistic tokens, pronunciation overrides, and configured G2Lex lexicons to synthesis requests
+    status: accepted
+    source_refs:
+      - git:cdec81d9853edfbf553664582e2b8e4968cf3f65
+    paths:
+      - README.md
+      - docs/architecture.md
+      - kittensynth/__init__.py
+      - kittensynth/api_contract.py
+      - kittensynth/voice.py
+      - pyproject.toml
+      - tests/test_dependency_boundary.py
+      - tests/test_g2p_requests.py
+      - tests/test_identity.py
+      - tests/test_public_api.py
+    sources:
+      - git:cdec81d9853edfbf553664582e2b8e4968cf3f65
+    prs: []
+    issues: []
+    contributors:
+      - "@holgern"

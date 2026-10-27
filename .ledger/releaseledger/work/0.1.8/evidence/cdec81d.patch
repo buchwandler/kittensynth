@@ -1,0 +1,682 @@
+ README.md                         |  31 +++++++-
+ docs/architecture.md              |  35 ++++-----
+ kittensynth/__init__.py           |  34 +++++++++
+ kittensynth/api_contract.py       |   7 +-
+ kittensynth/voice.py              | 141 +++++++++++++++++++++++++++++++++--
+ pyproject.toml                    |   4 +-
+ tests/test_dependency_boundary.py |   4 +-
+ tests/test_g2p_requests.py        | 150 ++++++++++++++++++++++++++++++++++++++
+ tests/test_identity.py            |   2 +-
+ tests/test_public_api.py          |  15 +++-
+ 10 files changed, 386 insertions(+), 37 deletions(-)
+
+diff --git a/README.md b/README.md
+index 8a83e0a..da5073e 100644
+--- a/README.md
++++ b/README.md
+@@ -117,7 +117,7 @@ print(runtime_identity())
+
+ A catalog default voice takes precedence; otherwise KittenSynth selects `Jasper` when listed, then the first public alias. Catalog-provided voice metadata is preserved. When a catalog provides only `metadata.voice_aliases`, voices are described with unknown gender and English language defaults; gender is never guessed from an alias.
+
+-`runtime_identity()` returns deterministic engine, KittenSynth, kitteng2p, OnnxVoice, and request-API versions. It contains no paths or machine-local state. `request_api_contract()` declares `KittenVoice.synthesize_prepared` as the synthesis entrypoint and advertises `KittenVoice.measure_prepared` for exact `model_tokens` request measurement; prepared-text boundaries remain caller-owned, and linguistic tokens, pronunciation overrides, whole-request phonemes, speakers, word timings, and request-level voice controls are not supported. The package exports typed errors such as `EmptyTextError`, `InvalidVoiceError`, `OnnxVoiceContractError`, `CatalogUnavailableError`, and `ModelInferenceError`; no Readio dependency is required.
++`runtime_identity()` returns deterministic engine, KittenSynth, kitteng2p, OnnxVoice, and request-API versions. It contains no paths or machine-local state. `request_api_contract()` declares `KittenVoice.synthesize_prepared` as the synthesis entrypoint and advertises `KittenVoice.measure_prepared` for exact `model_tokens` request measurement; prepared-text boundaries remain caller-owned. KittenSynth supports optional linguistic tokens, explicit IPA pronunciation overrides, and configured G2Lex sources; whole-request phonemes, speakers, word timings, and request-level voice controls remain unsupported. The package exports typed errors such as `EmptyTextError`, `InvalidVoiceError`, `OnnxVoiceContractError`, `CatalogUnavailableError`, and `ModelInferenceError`; no Readio dependency is required.
+
+ ## Measure prepared input without inference
+
+@@ -135,6 +135,35 @@ For supported Kitten 0.8 models, `max_tokens` is the hard limit of 512 total mod
+
+ The `capacity_policy_revision` metadata identifies the model, frontend, and capacity policy used for the measurement. Measurement does not run acoustic inference. Synthesis rejects over-limit input with `SynthesisInputTooLongError` and never truncates or splits text.
+
++## Lexicons and request-level pronunciation context
++
++The default remains eSpeak-only. Select named G2Lex sources or pin local `.g2lex` files through `g2p_config`; source lists are ordered, and explicit IPA spans have highest precedence:
++
++```python
++from kittensynth import (
++    G2LexFileRef,
++    KittenG2PConfig,
++    LinguisticToken,
++    PronunciationOverride,
++)
++
++config = KittenG2PConfig(
++    lexicons=("lexhint",),
++    g2lex_files=(G2LexFileRef("pronunciations.g2lex", sha256="<sha256>"),),
++)
++text = "Read the record."
++tokens = (LinguisticToken(9, 15, "record", pos="NOUN", tag="NN"),)
++spans = (PronunciationOverride(9, 15, "ˈɹɛkɚd"),)
++
++with KittenVoice.from_pretrained("nano-0.8-int8", g2p_config=config) as model:
++    measure = model.measure_prepared(text, tokens=tokens, pronunciation_overrides=spans)
++    result = model.synthesize_prepared(text, tokens=tokens, pronunciation_overrides=spans)
++    assert measure.token_count == result.metadata["token_count"]
++    print(result.metadata["pronunciation_trace"])
++```
++
++`LinguisticToken` offsets are Python string offsets into the exact prepared text. Measurement and synthesis pass the same tokens and overrides through the same frontend, so their model-token counts and pronunciation choices agree. Result traces identify source, selector, content hashes, and the decision reason. Calls without a G2P configuration keep the historical eSpeak-only path; `g2p=` remains supported and cannot be combined with `g2p_config=`.
++
+ ## Local model
+
+ ```python
+diff --git a/docs/architecture.md b/docs/architecture.md
+index 4c7b4e8..76043a0 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -2,21 +2,22 @@
+
+ ## Ownership
+
+-| Concern                                     | Owner                            |
+-| ------------------------------------------- | -------------------------------- |
+-| semantic written-to-spoken preparation      | caller                           |
+-| eSpeak execution                            | `kitteng2p` / `espeakng-runtime` |
+-| Kitten phoneme tokenization                 | `kitteng2p`                      |
+-| Kitten token IDs + framing                  | `kitteng2p`                      |
+-| voice alias/style-row selection             | `kittensynth`                    |
+-| speed-prior application                     | `kittensynth`                    |
+-| catalog/download/cache/integrity            | `onnxvoice`                      |
+-| ONNX Runtime session/providers              | `onnxvoice`                      |
+-| graph ABI + tail trimming                   | `onnxvoice` Kitten adapter       |
+-| WAV/container output                        | `kittensynth` convenience result |
+-| static per-model/per-voice level correction | `kittensynth`                    |
+-| BS.1770 calibration measurement tooling     | `benchmarks` / `audiosig`        |
+-| final program loudness / mastering          | caller                           |
++| Concern                                             | Owner                            |
++| --------------------------------------------------- | -------------------------------- |
++| semantic written-to-spoken preparation              | caller                           |
++| eSpeak execution                                    | `kitteng2p` / `espeakng-runtime` |
++| Kitten phoneme tokenization                         | `kitteng2p`                      |
++| Kitten token IDs + framing                          | `kitteng2p`                      |
++| voice alias/style-row selection                     | `kittensynth`                    |
++| speed-prior application                             | `kittensynth`                    |
++| catalog/download/cache/integrity                    | `onnxvoice`                      |
++| ONNX Runtime session/providers                      | `onnxvoice`                      |
++| graph ABI + tail trimming                           | `onnxvoice` Kitten adapter       |
++| ordered G2Lex source selection + occurrence context | `kitteng2p`                      |
++| WAV/container output                                | `kittensynth` convenience result |
++| static per-model/per-voice level correction         | `kittensynth`                    |
++| BS.1770 calibration measurement tooling             | `benchmarks` / `audiosig`        |
++| final program loudness / mastering                  | caller                           |
+
+ ## Exact request measurement
+
+@@ -30,7 +31,7 @@ prepared text
+   -> ONNX inference
+ ```
+
+-`KittenVoice.measure_prepared(text)` returns `len(frontend.token_ids)` and never invokes ONNX inference. The current model catalog declares no authoritative hard token maximum, so the result uses `max_tokens=None` and `fits=None`. Unknown capacity is not infinite capacity; KittenSynth does not guess a maximum, split the request, or retry inference.
++`KittenVoice.measure_prepared(text, tokens=..., pronunciation_overrides=...)` returns `len(frontend.token_ids)` and never invokes ONNX inference. Synthesis accepts the same optional token annotations and explicit IPA spans and passes them through the identical G2P frontend. The current model catalog declares no authoritative hard token maximum, so the result uses `max_tokens=None` and `fits=None`. Unknown capacity is not infinite capacity; KittenSynth does not guess a maximum, split the request, or retry inference.
+
+ ## Static voice-level correction
+
+@@ -65,6 +66,6 @@ handling needed for parity.
+
+ `discover_models()` is KittenSynth's catalog-only public model/voice view. It delegates listing to the OnnxVoice manager and never installs or opens model artifacts. Its frozen records expose display metadata, sample rate, public voice aliases, a deterministic default voice, source revision, and catalog metadata. An explicit catalog default wins; `Jasper` is the package fallback when present, followed by the first public alias. Voice demographics are never inferred from a voice name.
+
+-The package-root `runtime_identity()` is a deterministic software identity for PCM-affecting stack versions: engine (`kitten`), KittenSynth, kitteng2p, OnnxVoice, and request API version. It does not include catalog/model revisions, cache paths, timestamps, or runtime objects; catalog/model revisions remain attached to `DiscoveredModel` metadata. `request_api_contract()` truthfully identifies `KittenVoice.synthesize_prepared` as the current API and declares unsupported capabilities false. KittenSynth does not depend on Readio.
++The package-root `runtime_identity()` is a deterministic software identity for PCM-affecting stack versions: engine (`kitten`), KittenSynth, kitteng2p, OnnxVoice, and request API version. It does not include catalog/model revisions, cache paths, timestamps, or runtime objects; catalog/model revisions remain attached to `DiscoveredModel` metadata. `request_api_contract()` identifies `KittenVoice.synthesize_prepared` as the current API and advertises linguistic tokens, explicit pronunciation overrides, and lexicon configuration; unsupported whole-request phonemes and other capabilities remain false. KittenSynth does not depend on Readio.
+
+ Public errors preserve failure categories: invalid requests use request-validation errors, catalog failures use `CatalogUnavailableError` (a `CatalogDiscoveryError` subtype), and graph execution failures use `ModelInferenceError`. OnnxVoice contract mismatches remain `OnnxVoiceContractError`.
+diff --git a/kittensynth/__init__.py b/kittensynth/__init__.py
+index 474f151..6212649 100644
+--- a/kittensynth/__init__.py
++++ b/kittensynth/__init__.py
+@@ -4,6 +4,27 @@ from importlib.metadata import PackageNotFoundError
+ from importlib.metadata import version as _distribution_version
+
+ from .api_contract import REQUEST_API_VERSION, request_api_contract
++
++try:
++    from kitteng2p import (
++        G2LexFileInspection,
++        G2LexFileRef,
++        KittenG2P,
++        KittenG2PConfig,
++        LexiconDiscoveryResult,
++        LinguisticToken,
++        NamedLexiconInfo,
++        PhonemizeResult,
++        PronunciationDiagnostic,
++        PronunciationOverride,
++        PronunciationTrace,
++        discover_lexicons,
++        inspect_g2lex_file,
++    )
++except ImportError as exc:
++    raise ImportError(
++        "KittenSynth requires kitteng2p>=0.1.2 for the public G2Lex request API"
++    ) from exc
+ from .config import SynthesisConfig
+ from .discovery import DescribedVoice, DiscoveredModel, discover_models
+ from .errors import (
+@@ -46,6 +67,19 @@ except PackageNotFoundError:
+ __all__ = [
+     "__version__",
+     "REQUEST_API_VERSION",
++    "G2LexFileInspection",
++    "G2LexFileRef",
++    "KittenG2P",
++    "KittenG2PConfig",
++    "LexiconDiscoveryResult",
++    "LinguisticToken",
++    "NamedLexiconInfo",
++    "PhonemizeResult",
++    "PronunciationDiagnostic",
++    "PronunciationOverride",
++    "PronunciationTrace",
++    "discover_lexicons",
++    "inspect_g2lex_file",
+     "DEFAULT_VOICE_ALIASES",
+     "CatalogDiscoveryError",
+     "CatalogUnavailableError",
+diff --git a/kittensynth/api_contract.py b/kittensynth/api_contract.py
+index 758db74..2fde32b 100644
+--- a/kittensynth/api_contract.py
++++ b/kittensynth/api_contract.py
+@@ -5,14 +5,15 @@ from __future__ import annotations
+ from collections.abc import Mapping
+ from types import MappingProxyType
+
+-REQUEST_API_VERSION = 1
++REQUEST_API_VERSION = 2
+
+ _REQUEST_API_CONTRACT: Mapping[str, str | bool] = MappingProxyType(
+     {
+         "entrypoint": "KittenVoice.synthesize_prepared",
+-        "supports_linguistic_tokens": False,
+-        "supports_pronunciation_overrides": False,
++        "supports_linguistic_tokens": True,
++        "supports_pronunciation_overrides": True,
+         "supports_whole_request_phonemes": False,
++        "supports_lexicons": True,
+         "supports_speakers": False,
+         "supports_word_timings": False,
+         "supports_voice_level": False,
+diff --git a/kittensynth/voice.py b/kittensynth/voice.py
+index fec2618..7f61026 100644
+--- a/kittensynth/voice.py
++++ b/kittensynth/voice.py
+@@ -1,11 +1,18 @@
+ from __future__ import annotations
+
+ from collections.abc import Mapping, Sequence
++from dataclasses import asdict
++from inspect import Parameter, signature
+ from pathlib import Path
+-from typing import Any
++from typing import Any, TypeAlias
+
+ import numpy as np
+-from kitteng2p import KittenG2P
++from kitteng2p import (
++    KittenG2P,
++    KittenG2PConfig,
++    LinguisticToken,
++    PronunciationOverride,
++)
+
+ from ._onnxvoice import (
+     install_pretrained_model,
+@@ -29,6 +36,30 @@ from .voice_level import (
+     apply_voice_level_calibration,
+ )
+
++TokenInput: TypeAlias = (
++    Sequence[LinguisticToken | Mapping[str, Any]] | LinguisticToken | Mapping[str, Any] | None
++)
++PronunciationInput: TypeAlias = (
++    Sequence[PronunciationOverride | Mapping[str, Any]]
++    | PronunciationOverride
++    | Mapping[str, Any]
++    | None
++)
++
++
++def _validate_g2p_options(
++    g2p: object | None,
++    g2p_config: KittenG2PConfig | None,
++) -> None:
++    if g2p is not None and g2p_config is not None:
++        raise ValueError("g2p and g2p_config cannot both be supplied")
++    if g2p_config is not None and not isinstance(g2p_config, KittenG2PConfig):
++        raise TypeError("g2p_config must be a KittenG2PConfig")
++    if g2p_config is not None and "config" not in signature(KittenG2P).parameters:
++        raise KittenSynthError(
++            "g2p_config requires kitteng2p>=0.1.2; upgrade kitteng2p to enable G2Lex support"
++        )
++
+
+ class KittenVoice:
+     def __init__(
+@@ -39,9 +70,11 @@ class KittenVoice:
+         metadata: Mapping[str, Any],
+         model_ref: str | None,
+         g2p: KittenG2P | None = None,
++        g2p_config: KittenG2PConfig | None = None,
+         model_id: str | None = None,
+         sample_rate: int = 24000,
+     ) -> None:
++        _validate_g2p_options(g2p, g2p_config)
+         self.runtime = runtime
+         self.model_ref = model_ref
+         self.model_id = model_id
+@@ -52,7 +85,13 @@ class KittenVoice:
+         )
+         self.sample_rate = int(sample_rate)
+         self._owns_g2p = g2p is None
+-        self.g2p = g2p or KittenG2P()
++        if g2p is not None:
++            self.g2p = g2p
++        elif g2p_config is not None:
++            self.g2p = KittenG2P(g2p_config)
++        else:
++            self.g2p = KittenG2P()
++        self.g2p_config = getattr(self.g2p, "config", g2p_config)
+         self.voice_bank = VoiceBank(
+             voices_path,
+             voice_aliases=self.metadata.get("voice_aliases"),
+@@ -77,7 +116,9 @@ class KittenVoice:
+         session_options: Any | None = None,
+         progress: Any | None = None,
+         g2p: KittenG2P | None = None,
++        g2p_config: KittenG2PConfig | None = None,
+     ) -> KittenVoice:
++        _validate_g2p_options(g2p, g2p_config)
+         resolved = install_pretrained_model(
+             model,
+             quality=quality,
+@@ -104,6 +145,7 @@ class KittenVoice:
+             model_ref=resolved.ref,
+             model_id=resolved.model_id,
+             g2p=g2p,
++            g2p_config=g2p_config,
+             sample_rate=resolved.sample_rate,
+         )
+
+@@ -118,7 +160,9 @@ class KittenVoice:
+         provider_options: Sequence[dict[str, Any]] | dict[str, dict[str, Any]] | None = None,
+         session_options: Any | None = None,
+         g2p: KittenG2P | None = None,
++        g2p_config: KittenG2PConfig | None = None,
+     ) -> KittenVoice:
++        _validate_g2p_options(g2p, g2p_config)
+         metadata = load_local_config(config_path)
+         runtime = open_local_model(
+             model_path=model_path,
+@@ -134,6 +178,7 @@ class KittenVoice:
+             metadata=metadata,
+             model_ref=None,
+             g2p=g2p,
++            g2p_config=g2p_config,
+             sample_rate=int(metadata.get("sample_rate") or 24000),
+         )
+
+@@ -164,16 +209,88 @@ class KittenVoice:
+         """Return the calibration decision made for the most recent synthesis."""
+         return self._last_voice_level_application
+
+-    def _prepare_text(self, text: str) -> Any:
++    def _prepare_text(
++        self,
++        text: str,
++        *,
++        tokens: TokenInput = None,
++        pronunciation_overrides: PronunciationInput = None,
++    ) -> Any:
+         if self._closed:
+             raise RuntimeError("KittenVoice is closed")
+         if not isinstance(text, str) or not text.strip():
+             raise EmptyTextError("text must contain speakable content")
+-        return self.g2p.phonemize_prepared(text)
+
+-    def measure_prepared(self, text: str) -> SynthesisMeasure:
++        method = self.g2p.phonemize_prepared
++        if tokens is None and pronunciation_overrides is None:
++            # Preserve the historical one-argument protocol for injected G2Ps.
++            return method(text)
++
++        try:
++            parameters = signature(method).parameters
++        except (TypeError, ValueError) as exc:
++            raise TypeError(
++                "the injected G2P does not expose token/override request capabilities"
++            ) from exc
++        accepts_kwargs = any(
++            parameter.kind is Parameter.VAR_KEYWORD for parameter in parameters.values()
++        )
++        kwargs: dict[str, Any] = {}
++        for name, value in (
++            ("tokens", tokens),
++            ("pronunciation_overrides", pronunciation_overrides),
++        ):
++            if value is None:
++                continue
++            if name not in parameters and not accepts_kwargs:
++                raise TypeError(
++                    f"the injected G2P does not support {name}; use KittenG2P "
++                    "or a compatible frontend"
++                )
++            kwargs[name] = value
++        return method(text, **kwargs)
++
++    def _g2p_configuration_identity(self) -> dict[str, Any]:
++        config = self.g2p_config
++        selected_sources = getattr(self.g2p, "pronunciation_identity", ())
++        selected = [
++            {key: value for key, value in source.items() if key != "path"}
++            for source in selected_sources
++            if isinstance(source, Mapping)
++        ]
++        identity: dict[str, Any] = {
++            "implementation": f"{type(self.g2p).__module__}.{type(self.g2p).__qualname__}",
++            "selected_sources": selected,
++        }
++        if isinstance(config, KittenG2PConfig):
++            identity["config"] = {
++                "language": config.language,
++                "espeak_mode": config.espeak_mode,
++                "lexicons": list(config.lexicons) if config.lexicons is not None else None,
++                "g2lex_files": [
++                    {
++                        "name": Path(reference.path).name,
++                        "sha256": reference.sha256,
++                        "logical_sha256": reference.logical_sha256,
++                    }
++                    for reference in config.g2lex_files
++                ],
++                "lexicon_data_policy": config.lexicon_data_policy,
++                "heteronym_policy": config.heteronym_policy,
++            }
++        return identity
++
++    def measure_prepared(
++        self,
++        text: str,
++        *,
++        tokens: TokenInput = None,
++        pronunciation_overrides: PronunciationInput = None,
++    ) -> SynthesisMeasure:
+         """Measure exact Kitten model tokens without acoustic inference."""
+-        frontend = self._prepare_text(text)
++        frontend = self._prepare_text(
++            text, tokens=tokens, pronunciation_overrides=pronunciation_overrides
++        )
+         token_count = len(frontend.token_ids)
+         return SynthesisMeasure(
+             token_count=token_count,
+@@ -190,8 +307,12 @@ class KittenVoice:
+         voice: str = "Jasper",
+         speed: float = 1.0,
+         config: SynthesisConfig | None = None,
++        tokens: TokenInput = None,
++        pronunciation_overrides: PronunciationInput = None,
+     ) -> SynthesisResult:
+-        frontend = self._prepare_text(text)
++        frontend = self._prepare_text(
++            text, tokens=tokens, pronunciation_overrides=pronunciation_overrides
++        )
+         token_count = len(frontend.token_ids)
+         if token_count > self._capacity.max_tokens:
+             raise SynthesisInputTooLongError(
+@@ -236,6 +357,9 @@ class KittenVoice:
+                 "phonemes": frontend.phonemes,
+                 "token_count": len(frontend.token_ids),
+                 "dropped_symbols": frontend.dropped_symbols,
++                "pronunciation_trace": [asdict(item) for item in frontend.pronunciation_trace],
++                "pronunciation_diagnostics": [asdict(item) for item in frontend.diagnostics],
++                "g2p_identity": self._g2p_configuration_identity(),
+                 "internal_voice": self.voice_bank.resolve(voice),
+                 "model_id": self.model_id,
+                 "voice_level": {
+@@ -261,6 +385,7 @@ class KittenVoice:
+             if callable(runtime_diagnostics)
+             else runtime_diagnostics,
+             "g2p": g2p_diagnostics,
++            "g2p_identity": self._g2p_configuration_identity(),
+         }
+
+     def close(self) -> None:
+diff --git a/pyproject.toml b/pyproject.toml
+index 92fe35d..5bf70d7 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -17,7 +17,7 @@ authors = [{name = "kittensynth contributors"}]
+ keywords = ["tts", "kitten", "kittentts", "onnx", "onnxruntime", "speech"]
+ dependencies = [
+   "numpy>=1.23",
+-  "kitteng2p>=0.1.1,<0.2",
++  "kitteng2p>=0.1.2,<0.2",
+   "onnxvoice>=0.2.10,<0.3",
+   "audiosig>=0.1.4,<0.2",
+ ]
+@@ -36,7 +36,7 @@ classifiers = [
+ huggingface = ["onnxvoice[huggingface]>=0.2.10,<0.3"]
+ cpu = ["onnxvoice[cpu,huggingface]>=0.2.10,<0.3"]
+ gpu = ["onnxvoice[gpu,huggingface]>=0.2.10,<0.3"]
+-bundled-g2p = ["kitteng2p[bundled]>=0.1.1,<0.2"]
++bundled-g2p = ["kitteng2p[bundled]>=0.1.2,<0.2"]
+ docs = [
+   "sphinx>=7.0.0",
+   "myst-parser>=2.0.0",
+diff --git a/tests/test_dependency_boundary.py b/tests/test_dependency_boundary.py
+index 3ab5434..0105436 100644
+--- a/tests/test_dependency_boundary.py
++++ b/tests/test_dependency_boundary.py
+@@ -20,5 +20,5 @@ def test_kitteng2p_dependency_floors_match_the_verified_release():
+     base = next(dep for dep in data["project"]["dependencies"] if dep.startswith("kitteng2p"))
+     bundled = data["project"]["optional-dependencies"]["bundled-g2p"][0]
+
+-    assert base == "kitteng2p>=0.1.1,<0.2"
+-    assert bundled == "kitteng2p[bundled]>=0.1.1,<0.2"
++    assert base == "kitteng2p>=0.1.2,<0.2"
++    assert bundled == "kitteng2p[bundled]>=0.1.2,<0.2"
+diff --git a/tests/test_g2p_requests.py b/tests/test_g2p_requests.py
+new file mode 100644
+index 0000000..d2c4b4d
+--- /dev/null
++++ b/tests/test_g2p_requests.py
+@@ -0,0 +1,150 @@
++from __future__ import annotations
++
++from dataclasses import dataclass
++from pathlib import Path
++from typing import Any
++
++import numpy as np
++import pytest
++
++from kittensynth import (
++    KittenG2P,
++    KittenG2PConfig,
++    KittenVoice,
++    LinguisticToken,
++    PronunciationOverride,
++)
++
++
++@dataclass
++class InferenceResult:
++    audio: np.ndarray
++    sample_rate: int = 24000
++
++
++class FakeRuntime:
++    def __init__(self) -> None:
++        self.inputs: list[tuple[int, ...]] = []
++
++    def infer(self, token_ids: tuple[int, ...], **kwargs: Any) -> InferenceResult:
++        self.inputs.append(tuple(token_ids))
++        return InferenceResult(np.array([0.0, 0.25, -0.25], dtype=np.float32))
++
++    def close(self) -> None:
++        pass
++
++
++class TextBackend:
++    def phonemize(self, text: str, *, language: str) -> str:
++        assert language == "en-us"
++        return "həloʊ"
++
++    def close(self) -> None:
++        pass
++
++
++class RecordingG2P:
++    def __init__(self) -> None:
++        self.frontend = KittenG2P(backend=TextBackend())
++        self.calls: list[tuple[str, Any, Any]] = []
++
++    def phonemize_prepared(
++        self,
++        text: str,
++        *,
++        tokens: Any = None,
++        pronunciation_overrides: Any = None,
++    ):
++        self.calls.append((text, tokens, pronunciation_overrides))
++        return self.frontend.phonemize_prepared(
++            text, tokens=tokens, pronunciation_overrides=pronunciation_overrides
++        )
++
++    def close(self) -> None:
++        self.frontend.close()
++
++
++class LegacyG2P:
++    """Pre-request-option injection shape: only accepts a text argument."""
++
++    def __init__(self) -> None:
++        self.frontend = KittenG2P(backend=TextBackend())
++
++    def phonemize_prepared(self, text: str):
++        return self.frontend.phonemize_prepared(text)
++
++    def close(self) -> None:
++        self.frontend.close()
++
++
++def make_voice(tmp_path: Path, *, g2p: Any, g2p_config: KittenG2PConfig | None = None):
++    voices_path = tmp_path / "voices.npz"
++    np.savez(voices_path, **{"expr-voice-2-m": np.arange(40, dtype=np.float32).reshape(10, 4)})
++    runtime = FakeRuntime()
++    voice = KittenVoice(
++        runtime=runtime,
++        voices_path=voices_path,
++        metadata={"voice_aliases": {"Jasper": "expr-voice-2-m"}},
++        model_ref=None,
++        g2p=g2p,
++        g2p_config=g2p_config,
++    )
++    return voice, runtime
++
++
++def test_measurement_and_synthesis_forward_identical_tokens_and_overrides(tmp_path):
++    text = "Hello, bow!"
++    start = text.index("bow")
++    tokens = (LinguisticToken(start, start + 3, "bow", pos="VERB", tag="VB"),)
++    overrides = (PronunciationOverride(start, start + 3, "baʊ"),)
++    g2p = RecordingG2P()
++    voice, runtime = make_voice(tmp_path, g2p=g2p)
++
++    measured = voice.measure_prepared(text, tokens=tokens, pronunciation_overrides=overrides)
++    assert runtime.inputs == []
++    result = voice.synthesize_prepared(text, tokens=tokens, pronunciation_overrides=overrides)
++
++    assert measured.token_count == len(runtime.inputs[-1])
++    assert g2p.calls == [(text, tokens, overrides), (text, tokens, overrides)]
++    assert result.metadata is not None
++    assert result.metadata["pronunciation_trace"][-1]["source"] == "explicit"
++    assert result.metadata["pronunciation_trace"][-1]["text"] == "bow"
++    assert result.metadata["pronunciation_diagnostics"] == []
++    voice.close()
++
++
++def test_legacy_injected_g2p_keeps_one_argument_call_compatible(tmp_path):
++    g2p = LegacyG2P()
++    voice, _runtime = make_voice(tmp_path, g2p=g2p)
++
++    assert voice.measure_prepared("hello").token_count > 0
++    voice.close()
++
++
++def test_g2p_config_is_forwarded_and_identified_in_diagnostics(tmp_path, monkeypatch):
++    config = KittenG2PConfig(lexicons=("lexhint",), heteronym_policy="off")
++    created: list[KittenG2PConfig | None] = []
++
++    class ConfiguredG2P(LegacyG2P):
++        def __init__(self, config: KittenG2PConfig | None = None) -> None:
++            super().__init__()
++            self.config = config
++            created.append(config)
++
++    monkeypatch.setattr("kittensynth.voice.KittenG2P", ConfiguredG2P)
++    voice, _runtime = make_voice(tmp_path, g2p=None, g2p_config=config)
++
++    assert created == [config]
++    identity = voice.diagnostics()["g2p_identity"]
++    assert identity["config"]["lexicons"] == ["lexhint"]
++    assert identity["config"]["heteronym_policy"] == "off"
++    voice.close()
++
++
++def test_custom_g2p_and_g2p_config_are_rejected_as_ambiguous(tmp_path):
++    with pytest.raises(ValueError, match="cannot both be supplied"):
++        make_voice(
++            tmp_path,
++            g2p=LegacyG2P(),
++            g2p_config=KittenG2PConfig(),
++        )
+diff --git a/tests/test_identity.py b/tests/test_identity.py
+index f4ef393..94341a0 100644
+--- a/tests/test_identity.py
++++ b/tests/test_identity.py
+@@ -19,7 +19,7 @@ def test_runtime_identity_is_exact_deterministic_and_path_free(monkeypatch):
+         "engine_version": "0.1.2",
+         "g2p_revision": "0.1.1",
+         "runtime_revision": "0.2.3",
+-        "request_api_version": "1",
++        "request_api_version": "2",
+     }
+     assert all(not isinstance(value, Path) for value in identity_map.values())
+     assert all("/" not in value for value in identity_map.values() if value is not None)
+diff --git a/tests/test_public_api.py b/tests/test_public_api.py
+index c11f4c9..413891f 100644
+--- a/tests/test_public_api.py
++++ b/tests/test_public_api.py
+@@ -13,6 +13,14 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
+         "SynthesisResult",
+         "SynthesisMeasure",
+         "discover_models",
++        "KittenG2P",
++        "KittenG2PConfig",
++        "G2LexFileRef",
++        "LinguisticToken",
++        "PronunciationOverride",
++        "PronunciationTrace",
++        "discover_lexicons",
++        "inspect_g2lex_file",
+         "runtime_identity",
+     )
+     required_errors = (
+@@ -41,8 +49,9 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
+ def test_request_api_contract_is_truthful_and_public():
+     expected = {
+         "entrypoint": "KittenVoice.synthesize_prepared",
+-        "supports_linguistic_tokens": False,
+-        "supports_pronunciation_overrides": False,
++        "supports_linguistic_tokens": True,
++        "supports_pronunciation_overrides": True,
++        "supports_lexicons": True,
+         "supports_whole_request_phonemes": False,
+         "supports_speakers": False,
+         "supports_word_timings": False,
+@@ -53,7 +62,7 @@ def test_request_api_contract_is_truthful_and_public():
+         "measurement_metric": "model_tokens",
+     }
+
+-    assert kittensynth.REQUEST_API_VERSION == 1
++    assert kittensynth.REQUEST_API_VERSION == 2
+     assert "REQUEST_API_VERSION" in kittensynth.__all__
+     assert "request_api_contract" in kittensynth.__all__
+     assert dict(kittensynth.request_api_contract()) == expected
