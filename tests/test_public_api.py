@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from inspect import signature
 from typing import Any, cast
 
 import kittensynth
@@ -72,6 +73,19 @@ def test_request_api_contract_is_truthful_and_public():
         pass
     else:
         raise AssertionError("request API contract must be immutable")
+
+
+def test_request_api_v2_exposes_optional_linguistic_inputs_on_both_paths():
+    assert kittensynth.REQUEST_API_VERSION == 2
+    for entrypoint in (
+        kittensynth.KittenVoice.measure_prepared,
+        kittensynth.KittenVoice.synthesize_prepared,
+    ):
+        parameters = signature(entrypoint).parameters
+        assert parameters["tokens"].default is None
+        assert parameters["pronunciation_overrides"].default is None
+
+    assert kittensynth.runtime_identity()["request_api_version"] == "2"
 
 
 def test_measurement_public_api_import_does_not_load_onnx_runtime():

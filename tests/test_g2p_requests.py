@@ -95,7 +95,18 @@ def make_voice(tmp_path: Path, *, g2p: Any, g2p_config: KittenG2PConfig | None =
 def test_measurement_and_synthesis_forward_identical_tokens_and_overrides(tmp_path):
     text = "Hello, bow!"
     start = text.index("bow")
-    tokens = (LinguisticToken(start, start + 3, "bow", pos="VERB", tag="VB"),)
+    tokens = (
+        LinguisticToken(
+            start,
+            start + 3,
+            "bow",
+            lemma="bow",
+            pos=None,
+            tag=None,
+            morph=None,
+            language="en-us",
+        ),
+    )
     overrides = (PronunciationOverride(start, start + 3, "baʊ"),)
     g2p = RecordingG2P()
     voice, runtime = make_voice(tmp_path, g2p=g2p)
@@ -110,6 +121,22 @@ def test_measurement_and_synthesis_forward_identical_tokens_and_overrides(tmp_pa
     assert result.metadata["pronunciation_trace"][-1]["source"] == "explicit"
     assert result.metadata["pronunciation_trace"][-1]["text"] == "bow"
     assert result.metadata["pronunciation_diagnostics"] == []
+    voice.close()
+
+
+def test_request_without_linguistic_tokens_still_measures_and_synthesizes(tmp_path):
+    g2p = RecordingG2P()
+    voice, runtime = make_voice(tmp_path, g2p=g2p)
+
+    measured = voice.measure_prepared("Read the record.")
+    result = voice.synthesize_prepared("Read the record.")
+
+    assert measured.token_count == len(runtime.inputs[-1])
+    assert result.audio.size > 0
+    assert g2p.calls == [
+        ("Read the record.", None, None),
+        ("Read the record.", None, None),
+    ]
     voice.close()
 
 

@@ -152,7 +152,11 @@ config = KittenG2PConfig(
     g2lex_files=(G2LexFileRef("pronunciations.g2lex", sha256="<sha256>"),),
 )
 text = "Read the record."
-tokens = (LinguisticToken(9, 15, "record", pos="NOUN", tag="NN"),)
+tokens = (
+    LinguisticToken(
+        9, 15, "record", pos="NOUN", tag="NN", lemma="record", morph=None
+    ),
+)
 spans = (PronunciationOverride(9, 15, "ˈɹɛkɚd"),)
 
 with KittenVoice.from_pretrained("nano-0.8-int8", g2p_config=config) as model:
@@ -162,7 +166,7 @@ with KittenVoice.from_pretrained("nano-0.8-int8", g2p_config=config) as model:
     print(result.metadata["pronunciation_trace"])
 ```
 
-`LinguisticToken` offsets are Python string offsets into the exact prepared text. Measurement and synthesis pass the same tokens and overrides through the same frontend, so their model-token counts and pronunciation choices agree. Result traces identify source, selector, content hashes, and the decision reason. Calls without a G2P configuration keep the historical eSpeak-only path; `g2p=` remains supported and cannot be combined with `g2p_config=`.
+`LinguisticToken` needs only `start`, `end`, and `text` to locate a token. POS, tag, lemma, morphology, and language are optional context; `morph=None` is valid and should not be replaced with a placeholder. Requests without tokens remain valid and use KittenG2P's normal path. Measurement and synthesis pass the same tokens and overrides through the same frontend, so their model-token counts and pronunciation choices agree. Result traces identify source, selector, content hashes, and the decision reason. Calls without a G2P configuration keep the historical eSpeak-only path; `g2p=` remains supported and cannot be combined with `g2p_config=`.
 
 ## Local model
 
