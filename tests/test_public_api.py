@@ -13,6 +13,14 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
         "SynthesisResult",
         "SynthesisMeasure",
         "discover_models",
+        "KittenG2P",
+        "KittenG2PConfig",
+        "G2LexFileRef",
+        "LinguisticToken",
+        "PronunciationOverride",
+        "PronunciationTrace",
+        "discover_lexicons",
+        "inspect_g2lex_file",
         "runtime_identity",
     )
     required_errors = (
@@ -41,8 +49,9 @@ def test_readio_expected_public_api_and_typed_errors_are_exported():
 def test_request_api_contract_is_truthful_and_public():
     expected = {
         "entrypoint": "KittenVoice.synthesize_prepared",
-        "supports_linguistic_tokens": False,
-        "supports_pronunciation_overrides": False,
+        "supports_linguistic_tokens": True,
+        "supports_pronunciation_overrides": True,
+        "supports_lexicons": True,
         "supports_whole_request_phonemes": False,
         "supports_speakers": False,
         "supports_word_timings": False,
@@ -53,7 +62,7 @@ def test_request_api_contract_is_truthful_and_public():
         "measurement_metric": "model_tokens",
     }
 
-    assert kittensynth.REQUEST_API_VERSION == 1
+    assert kittensynth.REQUEST_API_VERSION == 2
     assert "REQUEST_API_VERSION" in kittensynth.__all__
     assert "request_api_contract" in kittensynth.__all__
     assert dict(kittensynth.request_api_contract()) == expected

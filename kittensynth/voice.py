@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import asdict
+from inspect import Parameter, signature
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 import numpy as np
-from kitteng2p import KittenG2P
+from kitteng2p import (
+    KittenG2P,
+    KittenG2PConfig,
+    LinguisticToken,
+    PronunciationOverride,
+)
 
 from ._onnxvoice import (
     install_pretrained_model,
@@ -29,6 +36,30 @@ from .voice_level import (
     apply_voice_level_calibration,
 )
 
+TokenInput: TypeAlias = (
+    Sequence[LinguisticToken | Mapping[str, Any]] | LinguisticToken | Mapping[str, Any] | None
+)
+PronunciationInput: TypeAlias = (
+    Sequence[PronunciationOverride | Mapping[str, Any]]
+    | PronunciationOverride
+    | Mapping[str, Any]
+    | None
+)
+
+
+def _validate_g2p_options(
+    g2p: object | None,
+    g2p_config: KittenG2PConfig | None,
+) -> None:
+    if g2p is not None and g2p_config is not None:
+        raise ValueError("g2p and g2p_config cannot both be supplied")
+    if g2p_config is not None and not isinstance(g2p_config, KittenG2PConfig):
+        raise TypeError("g2p_config must be a KittenG2PConfig")
+    if g2p_config is not None and "config" not in signature(KittenG2P).parameters:
+        raise KittenSynthError(
+            "g2p_config requires kitteng2p>=0.1.2; upgrade kitteng2p to enable G2Lex support"
+        )
+
 
 class KittenVoice:
     def __init__(
@@ -39,9 +70,11 @@ class KittenVoice:
         metadata: Mapping[str, Any],
         model_ref: str | None,
         g2p: KittenG2P | None = None,
+        g2p_config: KittenG2PConfig | None = None,
         model_id: str | None = None,
         sample_rate: int = 24000,
     ) -> None:
+        _validate_g2p_options(g2p, g2p_config)
         self.runtime = runtime
         self.model_ref = model_ref
         self.model_id = model_id
@@ -52,7 +85,13 @@ class KittenVoice:
         )
         self.sample_rate = int(sample_rate)
         self._owns_g2p = g2p is None
-        self.g2p = g2p or KittenG2P()
+        if g2p is not None:
+            self.g2p = g2p
+        elif g2p_config is not None:
+            self.g2p = KittenG2P(g2p_config)
+        else:
+            self.g2p = KittenG2P()
+        self.g2p_config = getattr(self.g2p, "config", g2p_config)
         self.voice_bank = VoiceBank(
             voices_path,
             voice_aliases=self.metadata.get("voice_aliases"),
@@ -77,7 +116,9 @@ class KittenVoice:
         session_options: Any | None = None,
         progress: Any | None = None,
         g2p: KittenG2P | None = None,
+        g2p_config: KittenG2PConfig | None = None,
     ) -> KittenVoice:
+        _validate_g2p_options(g2p, g2p_config)
         resolved = install_pretrained_model(
             model,
             quality=quality,
@@ -104,6 +145,7 @@ class KittenVoice:
             model_ref=resolved.ref,
             model_id=resolved.model_id,
             g2p=g2p,
+            g2p_config=g2p_config,
             sample_rate=resolved.sample_rate,
         )
 
@@ -118,7 +160,9 @@ class KittenVoice:
         provider_options: Sequence[dict[str, Any]] | dict[str, dict[str, Any]] | None = None,
         session_options: Any | None = None,
         g2p: KittenG2P | None = None,
+        g2p_config: KittenG2PConfig | None = None,
     ) -> KittenVoice:
+        _validate_g2p_options(g2p, g2p_config)
         metadata = load_local_config(config_path)
         runtime = open_local_model(
             model_path=model_path,
@@ -134,6 +178,7 @@ class KittenVoice:
             metadata=metadata,
             model_ref=None,
             g2p=g2p,
+            g2p_config=g2p_config,
             sample_rate=int(metadata.get("sample_rate") or 24000),
         )
 
@@ -164,16 +209,88 @@ class KittenVoice:
         """Return the calibration decision made for the most recent synthesis."""
         return self._last_voice_level_application
 
-    def _prepare_text(self, text: str) -> Any:
+    def _prepare_text(
+        self,
+        text: str,
+        *,
+        tokens: TokenInput = None,
+        pronunciation_overrides: PronunciationInput = None,
+    ) -> Any:
         if self._closed:
             raise RuntimeError("KittenVoice is closed")
         if not isinstance(text, str) or not text.strip():
             raise EmptyTextError("text must contain speakable content")
-        return self.g2p.phonemize_prepared(text)
 
-    def measure_prepared(self, text: str) -> SynthesisMeasure:
+        method = self.g2p.phonemize_prepared
+        if tokens is None and pronunciation_overrides is None:
+            # Preserve the historical one-argument protocol for injected G2Ps.
+            return method(text)
+
+        try:
+            parameters = signature(method).parameters
+        except (TypeError, ValueError) as exc:
+            raise TypeError(
+                "the injected G2P does not expose token/override request capabilities"
+            ) from exc
+        accepts_kwargs = any(
+            parameter.kind is Parameter.VAR_KEYWORD for parameter in parameters.values()
+        )
+        kwargs: dict[str, Any] = {}
+        for name, value in (
+            ("tokens", tokens),
+            ("pronunciation_overrides", pronunciation_overrides),
+        ):
+            if value is None:
+                continue
+            if name not in parameters and not accepts_kwargs:
+                raise TypeError(
+                    f"the injected G2P does not support {name}; use KittenG2P "
+                    "or a compatible frontend"
+                )
+            kwargs[name] = value
+        return method(text, **kwargs)
+
+    def _g2p_configuration_identity(self) -> dict[str, Any]:
+        config = self.g2p_config
+        selected_sources = getattr(self.g2p, "pronunciation_identity", ())
+        selected = [
+            {key: value for key, value in source.items() if key != "path"}
+            for source in selected_sources
+            if isinstance(source, Mapping)
+        ]
+        identity: dict[str, Any] = {
+            "implementation": f"{type(self.g2p).__module__}.{type(self.g2p).__qualname__}",
+            "selected_sources": selected,
+        }
+        if isinstance(config, KittenG2PConfig):
+            identity["config"] = {
+                "language": config.language,
+                "espeak_mode": config.espeak_mode,
+                "lexicons": list(config.lexicons) if config.lexicons is not None else None,
+                "g2lex_files": [
+                    {
+                        "name": Path(reference.path).name,
+                        "sha256": reference.sha256,
+                        "logical_sha256": reference.logical_sha256,
+                    }
+                    for reference in config.g2lex_files
+                ],
+                "lexicon_data_policy": config.lexicon_data_policy,
+                "heteronym_policy": config.heteronym_policy,
+            }
+        return identity
+
+    def measure_prepared(
+        self,
+        text: str,
+        *,
+        tokens: TokenInput = None,
+        pronunciation_overrides: PronunciationInput = None,
+    ) -> SynthesisMeasure:
         """Measure exact Kitten model tokens without acoustic inference."""
-        frontend = self._prepare_text(text)
+        frontend = self._prepare_text(
+            text, tokens=tokens, pronunciation_overrides=pronunciation_overrides
+        )
         token_count = len(frontend.token_ids)
         return SynthesisMeasure(
             token_count=token_count,
@@ -190,8 +307,12 @@ class KittenVoice:
         voice: str = "Jasper",
         speed: float = 1.0,
         config: SynthesisConfig | None = None,
+        tokens: TokenInput = None,
+        pronunciation_overrides: PronunciationInput = None,
     ) -> SynthesisResult:
-        frontend = self._prepare_text(text)
+        frontend = self._prepare_text(
+            text, tokens=tokens, pronunciation_overrides=pronunciation_overrides
+        )
         token_count = len(frontend.token_ids)
         if token_count > self._capacity.max_tokens:
             raise SynthesisInputTooLongError(
@@ -236,6 +357,9 @@ class KittenVoice:
                 "phonemes": frontend.phonemes,
                 "token_count": len(frontend.token_ids),
                 "dropped_symbols": frontend.dropped_symbols,
+                "pronunciation_trace": [asdict(item) for item in frontend.pronunciation_trace],
+                "pronunciation_diagnostics": [asdict(item) for item in frontend.diagnostics],
+                "g2p_identity": self._g2p_configuration_identity(),
                 "internal_voice": self.voice_bank.resolve(voice),
                 "model_id": self.model_id,
                 "voice_level": {
@@ -261,6 +385,7 @@ class KittenVoice:
             if callable(runtime_diagnostics)
             else runtime_diagnostics,
             "g2p": g2p_diagnostics,
+            "g2p_identity": self._g2p_configuration_identity(),
         }
 
     def close(self) -> None:

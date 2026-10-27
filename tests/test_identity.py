@@ -19,7 +19,7 @@ def test_runtime_identity_is_exact_deterministic_and_path_free(monkeypatch):
         "engine_version": "0.1.2",
         "g2p_revision": "0.1.1",
         "runtime_revision": "0.2.3",
-        "request_api_version": "1",
+        "request_api_version": "2",
     }
     assert all(not isinstance(value, Path) for value in identity_map.values())
     assert all("/" not in value for value in identity_map.values() if value is not None)

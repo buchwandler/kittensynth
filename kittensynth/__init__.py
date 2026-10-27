@@ -4,6 +4,27 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _distribution_version
 
 from .api_contract import REQUEST_API_VERSION, request_api_contract
+
+try:
+    from kitteng2p import (
+        G2LexFileInspection,
+        G2LexFileRef,
+        KittenG2P,
+        KittenG2PConfig,
+        LexiconDiscoveryResult,
+        LinguisticToken,
+        NamedLexiconInfo,
+        PhonemizeResult,
+        PronunciationDiagnostic,
+        PronunciationOverride,
+        PronunciationTrace,
+        discover_lexicons,
+        inspect_g2lex_file,
+    )
+except ImportError as exc:
+    raise ImportError(
+        "KittenSynth requires kitteng2p>=0.1.2 for the public G2Lex request API"
+    ) from exc
 from .config import SynthesisConfig
 from .discovery import DescribedVoice, DiscoveredModel, discover_models
 from .errors import (
@@ -46,6 +67,19 @@ except PackageNotFoundError:
 __all__ = [
     "__version__",
     "REQUEST_API_VERSION",
+    "G2LexFileInspection",
+    "G2LexFileRef",
+    "KittenG2P",
+    "KittenG2PConfig",
+    "LexiconDiscoveryResult",
+    "LinguisticToken",
+    "NamedLexiconInfo",
+    "PhonemizeResult",
+    "PronunciationDiagnostic",
+    "PronunciationOverride",
+    "PronunciationTrace",
+    "discover_lexicons",
+    "inspect_g2lex_file",
     "DEFAULT_VOICE_ALIASES",
     "CatalogDiscoveryError",
     "CatalogUnavailableError",

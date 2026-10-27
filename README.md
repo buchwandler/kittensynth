@@ -117,7 +117,7 @@ print(runtime_identity())
 
 A catalog default voice takes precedence; otherwise KittenSynth selects `Jasper` when listed, then the first public alias. Catalog-provided voice metadata is preserved. When a catalog provides only `metadata.voice_aliases`, voices are described with unknown gender and English language defaults; gender is never guessed from an alias.
 
-`runtime_identity()` returns deterministic engine, KittenSynth, kitteng2p, OnnxVoice, and request-API versions. It contains no paths or machine-local state. `request_api_contract()` declares `KittenVoice.synthesize_prepared` as the synthesis entrypoint and advertises `KittenVoice.measure_prepared` for exact `model_tokens` request measurement; prepared-text boundaries remain caller-owned, and linguistic tokens, pronunciation overrides, whole-request phonemes, speakers, word timings, and request-level voice controls are not supported. The package exports typed errors such as `EmptyTextError`, `InvalidVoiceError`, `OnnxVoiceContractError`, `CatalogUnavailableError`, and `ModelInferenceError`; no Readio dependency is required.
+`runtime_identity()` returns deterministic engine, KittenSynth, kitteng2p, OnnxVoice, and request-API versions. It contains no paths or machine-local state. `request_api_contract()` declares `KittenVoice.synthesize_prepared` as the synthesis entrypoint and advertises `KittenVoice.measure_prepared` for exact `model_tokens` request measurement; prepared-text boundaries remain caller-owned. KittenSynth supports optional linguistic tokens, explicit IPA pronunciation overrides, and configured G2Lex sources; whole-request phonemes, speakers, word timings, and request-level voice controls remain unsupported. The package exports typed errors such as `EmptyTextError`, `InvalidVoiceError`, `OnnxVoiceContractError`, `CatalogUnavailableError`, and `ModelInferenceError`; no Readio dependency is required.
 
 ## Measure prepared input without inference
 
@@ -134,6 +134,35 @@ with KittenVoice.from_pretrained("nano-0.8-int8") as model:
 For supported Kitten 0.8 models, `max_tokens` is the hard limit of 512 total model-input IDs, derived from the model's 512-position embedding table. The count includes KittenG2P's framed sequence `(0, *ids, 10, 0)`, and `fits` is always `token_count <= max_tokens`.
 
 The `capacity_policy_revision` metadata identifies the model, frontend, and capacity policy used for the measurement. Measurement does not run acoustic inference. Synthesis rejects over-limit input with `SynthesisInputTooLongError` and never truncates or splits text.
+
+## Lexicons and request-level pronunciation context
+
+The default remains eSpeak-only. Select named G2Lex sources or pin local `.g2lex` files through `g2p_config`; source lists are ordered, and explicit IPA spans have highest precedence:
+
+```python
+from kittensynth import (
+    G2LexFileRef,
+    KittenG2PConfig,
+    LinguisticToken,
+    PronunciationOverride,
+)
+
+config = KittenG2PConfig(
+    lexicons=("lexhint",),
+    g2lex_files=(G2LexFileRef("pronunciations.g2lex", sha256="<sha256>"),),
+)
+text = "Read the record."
+tokens = (LinguisticToken(9, 15, "record", pos="NOUN", tag="NN"),)
+spans = (PronunciationOverride(9, 15, "ˈɹɛkɚd"),)
+
+with KittenVoice.from_pretrained("nano-0.8-int8", g2p_config=config) as model:
+    measure = model.measure_prepared(text, tokens=tokens, pronunciation_overrides=spans)
+    result = model.synthesize_prepared(text, tokens=tokens, pronunciation_overrides=spans)
+    assert measure.token_count == result.metadata["token_count"]
+    print(result.metadata["pronunciation_trace"])
+```
+
+`LinguisticToken` offsets are Python string offsets into the exact prepared text. Measurement and synthesis pass the same tokens and overrides through the same frontend, so their model-token counts and pronunciation choices agree. Result traces identify source, selector, content hashes, and the decision reason. Calls without a G2P configuration keep the historical eSpeak-only path; `g2p=` remains supported and cannot be combined with `g2p_config=`.
 
 ## Local model
 

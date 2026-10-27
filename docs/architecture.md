@@ -2,21 +2,22 @@
 
 ## Ownership
 
-| Concern                                     | Owner                            |
-| ------------------------------------------- | -------------------------------- |
-| semantic written-to-spoken preparation      | caller                           |
-| eSpeak execution                            | `kitteng2p` / `espeakng-runtime` |
-| Kitten phoneme tokenization                 | `kitteng2p`                      |
-| Kitten token IDs + framing                  | `kitteng2p`                      |
-| voice alias/style-row selection             | `kittensynth`                    |
-| speed-prior application                     | `kittensynth`                    |
-| catalog/download/cache/integrity            | `onnxvoice`                      |
-| ONNX Runtime session/providers              | `onnxvoice`                      |
-| graph ABI + tail trimming                   | `onnxvoice` Kitten adapter       |
-| WAV/container output                        | `kittensynth` convenience result |
-| static per-model/per-voice level correction | `kittensynth`                    |
-| BS.1770 calibration measurement tooling     | `benchmarks` / `audiosig`        |
-| final program loudness / mastering          | caller                           |
+| Concern                                             | Owner                            |
+| --------------------------------------------------- | -------------------------------- |
+| semantic written-to-spoken preparation              | caller                           |
+| eSpeak execution                                    | `kitteng2p` / `espeakng-runtime` |
+| Kitten phoneme tokenization                         | `kitteng2p`                      |
+| Kitten token IDs + framing                          | `kitteng2p`                      |
+| voice alias/style-row selection                     | `kittensynth`                    |
+| speed-prior application                             | `kittensynth`                    |
+| catalog/download/cache/integrity                    | `onnxvoice`                      |
+| ONNX Runtime session/providers                      | `onnxvoice`                      |
+| graph ABI + tail trimming                           | `onnxvoice` Kitten adapter       |
+| ordered G2Lex source selection + occurrence context | `kitteng2p`                      |
+| WAV/container output                                | `kittensynth` convenience result |
+| static per-model/per-voice level correction         | `kittensynth`                    |
+| BS.1770 calibration measurement tooling             | `benchmarks` / `audiosig`        |
+| final program loudness / mastering                  | caller                           |
 
 ## Exact request measurement
 
@@ -30,7 +31,7 @@ prepared text
   -> ONNX inference
 ```
 
-`KittenVoice.measure_prepared(text)` returns `len(frontend.token_ids)` and never invokes ONNX inference. The current model catalog declares no authoritative hard token maximum, so the result uses `max_tokens=None` and `fits=None`. Unknown capacity is not infinite capacity; KittenSynth does not guess a maximum, split the request, or retry inference.
+`KittenVoice.measure_prepared(text, tokens=..., pronunciation_overrides=...)` returns `len(frontend.token_ids)` and never invokes ONNX inference. Synthesis accepts the same optional token annotations and explicit IPA spans and passes them through the identical G2P frontend. The current model catalog declares no authoritative hard token maximum, so the result uses `max_tokens=None` and `fits=None`. Unknown capacity is not infinite capacity; KittenSynth does not guess a maximum, split the request, or retry inference.
 
 ## Static voice-level correction
 
@@ -65,6 +66,6 @@ handling needed for parity.
 
 `discover_models()` is KittenSynth's catalog-only public model/voice view. It delegates listing to the OnnxVoice manager and never installs or opens model artifacts. Its frozen records expose display metadata, sample rate, public voice aliases, a deterministic default voice, source revision, and catalog metadata. An explicit catalog default wins; `Jasper` is the package fallback when present, followed by the first public alias. Voice demographics are never inferred from a voice name.
 
-The package-root `runtime_identity()` is a deterministic software identity for PCM-affecting stack versions: engine (`kitten`), KittenSynth, kitteng2p, OnnxVoice, and request API version. It does not include catalog/model revisions, cache paths, timestamps, or runtime objects; catalog/model revisions remain attached to `DiscoveredModel` metadata. `request_api_contract()` truthfully identifies `KittenVoice.synthesize_prepared` as the current API and declares unsupported capabilities false. KittenSynth does not depend on Readio.
+The package-root `runtime_identity()` is a deterministic software identity for PCM-affecting stack versions: engine (`kitten`), KittenSynth, kitteng2p, OnnxVoice, and request API version. It does not include catalog/model revisions, cache paths, timestamps, or runtime objects; catalog/model revisions remain attached to `DiscoveredModel` metadata. `request_api_contract()` identifies `KittenVoice.synthesize_prepared` as the current API and advertises linguistic tokens, explicit pronunciation overrides, and lexicon configuration; unsupported whole-request phonemes and other capabilities remain false. KittenSynth does not depend on Readio.
 
 Public errors preserve failure categories: invalid requests use request-validation errors, catalog failures use `CatalogUnavailableError` (a `CatalogDiscoveryError` subtype), and graph execution failures use `ModelInferenceError`. OnnxVoice contract mismatches remain `OnnxVoiceContractError`.
