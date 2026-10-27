@@ -124,6 +124,69 @@ def test_measurement_and_synthesis_forward_identical_tokens_and_overrides(tmp_pa
     voice.close()
 
 
+@pytest.mark.parametrize("punctuation_attached", [False, True], ids=["spacy-like", "fallback-like"])
+def test_orchestration_token_shapes_measure_and_synthesize_with_same_frontend(
+    tmp_path: Path, punctuation_attached: bool
+):
+    text = "Hello, bow!"
+    if punctuation_attached:
+        tokens = (
+            LinguisticToken(0, 6, "Hello,", pos="INTJ"),
+            LinguisticToken(7, 11, "bow!", pos="NOUN"),
+        )
+    else:
+        tokens = (
+            LinguisticToken(0, 5, "Hello", pos="INTJ"),
+            LinguisticToken(5, 6, ",", pos="PUNCT"),
+            LinguisticToken(7, 10, "bow", pos="NOUN"),
+            LinguisticToken(10, 11, "!", pos="PUNCT"),
+        )
+    overrides = (PronunciationOverride(7, 10, "baʊ"),)
+    voice, runtime = make_voice(tmp_path, g2p=KittenG2P(backend=TextBackend()))
+
+    measured = voice.measure_prepared(text, tokens=tokens, pronunciation_overrides=overrides)
+    assert runtime.inputs == []
+    result = voice.synthesize_prepared(text, tokens=tokens, pronunciation_overrides=overrides)
+
+    assert len(runtime.inputs) == 1
+    assert measured.token_count == len(runtime.inputs[0])
+    assert measured.token_count == result.metadata["token_count"]
+    assert result.metadata["phonemes"].count(",") == 1
+    assert result.metadata["phonemes"].count("!") == 1
+    assert [
+        (item["start"], item["end"], item["text"])
+        for item in result.metadata["pronunciation_trace"]
+    ] == [(0, 5, "Hello"), (7, 10, "bow")]
+    voice.close()
+
+
+def test_minimum_g2p_keeps_exact_heteronym_context_with_surrounding_punctuation(tmp_path: Path):
+    text = "The refuse was collected."
+    start = text.index("refuse")
+    tokens = (
+        LinguisticToken(0, 3, "The", pos="DET"),
+        LinguisticToken(start, start + 6, "refuse", pos="NOUN", tag="NN", lemma="refuse"),
+        LinguisticToken(11, 14, "was", pos="AUX"),
+        LinguisticToken(15, 24, "collected", pos="VERB"),
+        LinguisticToken(24, 25, ".", pos="PUNCT"),
+    )
+    voice, runtime = make_voice(tmp_path, g2p=KittenG2P(backend=TextBackend()))
+
+    measured = voice.measure_prepared(text, tokens=tokens)
+    result = voice.synthesize_prepared(text, tokens=tokens)
+
+    trace = next(
+        item for item in result.metadata["pronunciation_trace"] if item["text"] == "refuse"
+    )
+    assert trace["source"] == "context-rule"
+    assert trace["selector"] == "SENSE_NOUN"
+    assert (trace["start"], trace["end"]) == (start, start + 6)
+    assert measured.token_count == len(runtime.inputs[0])
+    assert measured.token_count == result.metadata["token_count"]
+    assert result.metadata["phonemes"].count(".") == 1
+    voice.close()
+
+
 def test_request_without_linguistic_tokens_still_measures_and_synthesizes(tmp_path):
     g2p = RecordingG2P()
     voice, runtime = make_voice(tmp_path, g2p=g2p)

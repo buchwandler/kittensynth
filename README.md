@@ -166,7 +166,7 @@ with KittenVoice.from_pretrained("nano-0.8-int8", g2p_config=config) as model:
     print(result.metadata["pronunciation_trace"])
 ```
 
-`LinguisticToken` needs only `start`, `end`, and `text` to locate a token. POS, tag, lemma, morphology, and language are optional context; `morph=None` is valid and should not be replaced with a placeholder. Requests without tokens remain valid and use KittenG2P's normal path. Measurement and synthesis pass the same tokens and overrides through the same frontend, so their model-token counts and pronunciation choices agree. Result traces identify source, selector, content hashes, and the decision reason. Calls without a G2P configuration keep the historical eSpeak-only path; `g2p=` remains supported and cannot be combined with `g2p_config=`.
+`LinguisticToken` needs only `start`, `end`, and `text` to locate a token. POS, tag, lemma, morphology, and language are optional context; `morph=None` is valid and should not be replaced with a placeholder. Requests without tokens remain valid and use KittenG2P's normal path. Measurement and synthesis pass the same tokens and overrides through the same frontend, so their model-token counts and pronunciation choices agree. Result traces identify source, selector, content hashes, and the decision reason. Calls without a G2P configuration keep the historical eSpeak-only path; `g2p=` remains supported and cannot be combined with `g2p_config=`. `supports_linguistic_tokens=True` means optional source-aligned linguistic context is accepted; callers do not need to reproduce Kitteng2p's internal word boundaries.
 
 ## Local model
 

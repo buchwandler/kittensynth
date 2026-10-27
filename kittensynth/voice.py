@@ -57,7 +57,7 @@ def _validate_g2p_options(
         raise TypeError("g2p_config must be a KittenG2PConfig")
     if g2p_config is not None and "config" not in signature(KittenG2P).parameters:
         raise KittenSynthError(
-            "g2p_config requires kitteng2p>=0.1.2; upgrade kitteng2p to enable G2Lex support"
+            "g2p_config requires kitteng2p>=0.1.3; upgrade kitteng2p to enable G2Lex support"
         )
 
 

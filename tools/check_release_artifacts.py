@@ -15,12 +15,12 @@ PACKAGE = "kittensynth"
 FORBIDDEN = frozenset({"espeakng-loader", "phonemizer", "espeakng-runtime"})
 BASE_REQUIREMENTS = {
     "numpy": (">=1.23", ()),
-    "kitteng2p": (">=0.1.2,<0.2", ()),
+    "kitteng2p": (">=0.1.3,<0.2", ()),
     "onnxvoice": (">=0.2.10,<0.3", ()),
     "audiosig": (">=0.1.4,<0.2", ()),
 }
 OPTIONAL_REQUIREMENTS = (
-    ("bundled-g2p", "kitteng2p", ">=0.1.2,<0.2", ("bundled",)),
+    ("bundled-g2p", "kitteng2p", ">=0.1.3,<0.2", ("bundled",)),
     ("huggingface", "onnxvoice", ">=0.2.10,<0.3", ("huggingface",)),
     ("cpu", "onnxvoice", ">=0.2.10,<0.3", ("cpu", "huggingface")),
     ("gpu", "onnxvoice", ">=0.2.10,<0.3", ("gpu", "huggingface")),

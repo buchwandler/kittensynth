@@ -20,5 +20,5 @@ def test_kitteng2p_dependency_floors_match_the_verified_release():
     base = next(dep for dep in data["project"]["dependencies"] if dep.startswith("kitteng2p"))
     bundled = data["project"]["optional-dependencies"]["bundled-g2p"][0]
 
-    assert base == "kitteng2p>=0.1.2,<0.2"
-    assert bundled == "kitteng2p[bundled]>=0.1.2,<0.2"
+    assert base == "kitteng2p>=0.1.3,<0.2"
+    assert bundled == "kitteng2p[bundled]>=0.1.3,<0.2"

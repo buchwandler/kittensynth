@@ -33,6 +33,8 @@ prepared text
 
 `KittenVoice.measure_prepared(text, tokens=..., pronunciation_overrides=...)` returns `len(frontend.token_ids)` and never invokes ONNX inference. Synthesis accepts the same optional token annotations and explicit IPA spans and passes them through the identical G2P frontend. The current model catalog declares no authoritative hard token maximum, so the result uses `max_tokens=None` and `fits=None`. Unknown capacity is not infinite capacity; KittenSynth does not guess a maximum, split the request, or retry inference.
 
+The request API's `supports_linguistic_tokens=True` capability means optional source-aligned annotations are forwarded to Kitteng2p. It does not require callers to match Kitteng2p's internal word-token boundaries: Kitteng2p projects safe hints and ignores incompatible optional annotations while preserving strict source-alignment validation.
+
 ## Static voice-level correction
 
 Runtime calibration is an opt-in static gain lookup keyed by the exact managed model ID and Kitten internal voice/style ID. It never infers a managed identity for local models, measures loudness during synthesis, or performs dynamic normalization. The audio path is:

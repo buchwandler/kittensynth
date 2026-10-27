@@ -23,7 +23,7 @@ try:
     )
 except ImportError as exc:
     raise ImportError(
-        "KittenSynth requires kitteng2p>=0.1.2 for the public G2Lex request API"
+        "KittenSynth requires kitteng2p>=0.1.3 for the public G2Lex request API"
     ) from exc
 from .config import SynthesisConfig
 from .discovery import DescribedVoice, DiscoveredModel, discover_models
